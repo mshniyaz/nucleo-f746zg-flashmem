@@ -103,18 +103,19 @@ int main(void)
   FLASH_CS_High(); // CS pin should be default high
   // FLASH_ReadJEDECID();
   
+  FLASH_ResetDevice(); //! Reset entire device to test
   //TODO: Testing write protect disable
+  //! Do here
   
   //TODO: Testing writes
-  // FLASH_ResetDevice(); //! Reset entire device to test
-  // // Define some constants
-  // uint8_t data[4] = {0x32, 0xBA, 0x15, 0xCB};
-  // uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
-  // FLASH_WriteBuffer(data, 4, 0x00);
-  // FLASH_WriteExecute(pageAddress0);
-  // FLASH_ReadBuffer(0x00, 4);
-  // FLASH_ReadPage(pageAddress0);
-  // FLASH_ReadBuffer(0x00, 4);
+  // Define some constants
+  uint8_t data[4] = {0x32, 0xBA, 0x15, 0xCB};
+  uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
+  FLASH_WriteBuffer(data, 4, 0x00);
+  FLASH_WriteExecute(pageAddress0);
+  FLASH_ReadBuffer(0x00, 4);
+  FLASH_ReadPage(pageAddress0);
+  FLASH_ReadBuffer(0x00, 4);
   
   /* USER CODE END 2 */
 

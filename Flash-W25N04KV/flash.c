@@ -10,23 +10,29 @@
 // Instruction Set Constants
 const uint8_t RESET_DEVICE = 0xFF;
 const uint8_t GET_JEDEC = 0x9F;
-const uint8_t READ_STATUS_REGISTER = 0x0F;
+const uint8_t READ_REGISTER = 0x0F;
+const uint8_t WRITE_REGISTER = 0x01;
 const uint8_t READ_PAGE = 0x13;
 const uint8_t READ_BUFFER = 0x03;
 const uint8_t WRITE_ENABLE = 0x06;
 const uint8_t WRITE_BUFFER = 0x84; //! Unused bits in data buffer not erased
 const uint8_t WRITE_EXECUTE = 0x10;
 const uint8_t ERASE_BLOCK = 0xD8;
+
 // Addresses of 3 status registers
-const uint8_t STATUS_REGISTER_ONE = 0xA0;
-const uint8_t STATUS_REGISTER_TWO = 0xB0;
-const uint8_t STATUS_REGISTER_THREE = 0xC0;
+const uint8_t REGISTER_ONE = 0xA0;
+const uint8_t REGISTER_TWO = 0xB0;
+const uint8_t REGISTER_THREE = 0xC0;
+const uint8_t *REGISTERS[] = {
+    &REGISTER_ONE,
+    &REGISTER_TWO,
+    &REGISTER_THREE
+};
+
 // Timeout to use for all SPI communications (in ms)
 const uint32_t SPI_TIMEOUT = 100;
 
 //! General Operations
-// TODO: Extend error handling for transmit, receive, and malloc (for UART print)
-// TODO: Readd busy checks once testing of read/write is complete
 
 // Prints a string of arbitrary size via UART
 void UART_Printf(const char *format, ...)
@@ -96,6 +102,59 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
   memcpy(buf, response, size);
 }
 
+//! Managing Status Registers
+
+// Reads registers (either 1,2, or 3)
+uint8_t FLASH_ReadRegister(int registerNo)
+{
+  uint8_t registerResponse[1];
+
+  // Carry out the read instruction
+  FLASH_CS_Low();
+  FLASH_Transmit(&READ_REGISTER, 1, SPI_TIMEOUT);
+  if (registerNo >= 1 && registerNo <= 3)
+  {
+    FLASH_Transmit(REGISTERS[registerNo-1], 1, SPI_TIMEOUT);
+  }
+  else
+  {
+    FLASH_Transmit(REGISTERS[2], 1, SPI_TIMEOUT); // Get status register by deafult
+  }
+  FLASH_Receive(registerResponse, 1, SPI_TIMEOUT);
+  FLASH_CS_High();
+  return registerResponse[0];
+}
+
+// Read Write Enable Latch (WEL) Bit
+bool FLASH_IsWEL(void)
+{
+  uint8_t statusRegister = FLASH_ReadRegister(3);
+  bool isWriteEnabled = (statusRegister & (1 << 1)) >> 1; // WEL is 2nd last bit
+  return isWriteEnabled;
+}
+
+// Read BUSY Bit
+bool FLASH_IsBusy(void)
+{
+  uint8_t statusRegister = FLASH_ReadRegister(3);
+  bool isBusy = statusRegister & 1; // Busy bit is last bit
+  return isBusy;
+}
+
+// Wait till BUSY bit is cleared to zero
+void FLASH_AwaitNotBusy(void)
+{
+  while (FLASH_IsBusy())
+  {
+    HAL_Delay(1); // Short delays of 1ms
+  }
+}
+
+// Disable write protection for all blocks
+void FLASH_DisableWriteProtect(void) {
+  uint8_t protectRegister = FLASH_ReadRegister(1);
+}
+
 //! Read Operations
 
 // Read JEDEC ID of flash memory, including manufacturer and product ID
@@ -153,56 +212,6 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
     {
       UART_Printf("%02x ", readResponse[i]);
     }
-  }
-}
-
-// Reads status registers (either 1,2, or 3)
-uint8_t FLASH_ReadStatusRegister(int registerNo)
-{
-  uint8_t registerResponse[1];
-
-  // Carry out the read instruction
-  FLASH_CS_Low();
-  FLASH_Transmit(&READ_STATUS_REGISTER, 1, SPI_TIMEOUT);
-  if (registerNo == 1)
-  {
-    FLASH_Transmit(&STATUS_REGISTER_ONE, 1, SPI_TIMEOUT);
-  }
-  else if (registerNo == 2)
-  {
-    FLASH_Transmit(&STATUS_REGISTER_TWO, 1, SPI_TIMEOUT);
-  }
-  else
-  {
-    FLASH_Transmit(&STATUS_REGISTER_THREE, 1, SPI_TIMEOUT);
-  }
-  FLASH_Receive(registerResponse, 1, SPI_TIMEOUT);
-  FLASH_CS_High();
-  return registerResponse[0];
-}
-
-// Read Write Enable Latch (WEL) Bit
-bool FLASH_IsWEL(void)
-{
-  uint8_t statusRegister = FLASH_ReadStatusRegister(3);
-  bool isWriteEnabled = (statusRegister & (1 << 1)) >> 1; // WEL is 2nd last bit
-  return isWriteEnabled;
-}
-
-// Read BUSY Bit
-bool FLASH_IsBusy(void)
-{
-  uint8_t statusRegister = FLASH_ReadStatusRegister(3);
-  bool isBusy = statusRegister & 1; // Busy bit is last bit
-  return isBusy;
-}
-
-// Wait till BUSY bit is cleared to zero
-void FLASH_AwaitNotBusy(void)
-{
-  while (FLASH_IsBusy())
-  {
-    HAL_Delay(1); // Short delays of 1ms
   }
 }
 
