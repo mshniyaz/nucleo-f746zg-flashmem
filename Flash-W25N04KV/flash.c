@@ -150,9 +150,15 @@ void FLASH_AwaitNotBusy(void)
   }
 }
 
-// Disable write protection for all blocks
+// Disable write protection for all blocks and registers
 void FLASH_DisableWriteProtect(void) {
-  uint8_t protectRegister = FLASH_ReadRegister(1);
+  uint8_t newRegValue = 0x00; // Set all bits to zero
+
+  FLASH_CS_Low();
+  FLASH_Transmit(&WRITE_REGISTER, 1, SPI_TIMEOUT);
+  FLASH_Transmit(REGISTERS[0], 1, SPI_TIMEOUT);
+  FLASH_Transmit(&newRegValue, 1, SPI_TIMEOUT);
+  FLASH_CS_High();
 }
 
 //! Read Operations
@@ -172,8 +178,10 @@ void FLASH_ReadJEDECID(void)
   FLASH_CS_High();
 
   // Print JEDEC ID to UART
-  UART_Printf("\r\nJEDEC ID: 0x%02X 0x%02X 0x%02X\r\n",
+  UART_Printf("\r\n------------------------------\r\n");
+  UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
+  UART_Printf("\r\n------------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer
@@ -250,11 +258,13 @@ void FLASH_WriteExecute(uint8_t pageAddress[3])
 
 //! Erase Operations
 
-// Reset all pages in the flash memory to 0xFF
+// Reset all pages in the flash memory to 0xFF, and disable write protection
 void FLASH_ResetDevice(void)
 {
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&RESET_DEVICE, 1, SPI_TIMEOUT);
   FLASH_CS_High();
+
+  FLASH_DisableWriteProtect();
 }

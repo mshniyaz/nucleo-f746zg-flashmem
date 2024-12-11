@@ -101,21 +101,23 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   FLASH_CS_High(); // CS pin should be default high
-  // FLASH_ReadJEDECID();
+  FLASH_ReadJEDECID();
   
   FLASH_ResetDevice(); //! Reset entire device to test
-  //TODO: Testing write protect disable
-  //! Do here
-  
-  //TODO: Testing writes
+  // TODO: Testing writes
   // Define some constants
   uint8_t data[4] = {0x32, 0xBA, 0x15, 0xCB};
   uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
+  uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
+  FLASH_ReadBuffer(0x00, 4); // Should be 0x00 empty
   FLASH_WriteBuffer(data, 4, 0x00);
-  FLASH_WriteExecute(pageAddress0);
-  FLASH_ReadBuffer(0x00, 4);
+  FLASH_ReadBuffer(0x00, 4); // Should be filled with data
+  FLASH_WriteExecute(pageAddress1);
+  FLASH_ReadBuffer(0x00, 4); // Should be empty after writing to main array
+  FLASH_ReadPage(pageAddress1); 
+  FLASH_ReadBuffer(0x00, 4); // Should be filled after reading
   FLASH_ReadPage(pageAddress0);
-  FLASH_ReadBuffer(0x00, 4);
+  FLASH_ReadBuffer(0x00, 4); // Should be empty after reading from different page
   
   /* USER CODE END 2 */
 
