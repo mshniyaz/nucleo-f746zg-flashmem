@@ -111,7 +111,7 @@ int main(void)
   uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
   // Begin test
-  FLASH_EraseBlock(pageAddress0);
+  FLASH_EraseBlock(1); // 0xD8
   FLASH_ReadBuffer(0x00, 4); // Should be empty
   FLASH_WriteBuffer(data, 4, 0x00);
   FLASH_ReadBuffer(0x00, 4); // Should be filled with data

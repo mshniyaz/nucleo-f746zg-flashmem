@@ -29,16 +29,16 @@ void FLASH_DisableWriteProtect(void);
 
 // Read functions
 void FLASH_ReadJEDECID(void);
-void FLASH_ReadPage(uint8_t *pageAddress);
+void FLASH_ReadPage(uint32_t pageAddress);
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size);
 
 // Write Functions
 void FLASH_WriteEnable(void);
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
-void FLASH_WriteExecute(uint8_t *pageAddress);
+void FLASH_WriteExecute(uint32_t pageAddress);
 
 // Erase Functions
-void FLASH_EraseBlock(uint8_t pageAddress[3]);
+void FLASH_EraseBlock(uint32_t pageAddress);
 void FLASH_ResetDevice(void);
 void FLASH_EraseDevice(void);
 

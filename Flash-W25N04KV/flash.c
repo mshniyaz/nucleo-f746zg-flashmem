@@ -102,8 +102,8 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
   memcpy(buf, response, size);
 }
 
-// Convenience functions for splitting uint32_t (little indian) into 3 least significant bytes
-void getThreeLSB(uint32_t n, uint8_t* threeLSB) {
+// Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
+void uitn32GetLastThreeBits(uint32_t n, uint8_t* threeLSB) {
     for (int i = 0; i <= 2; i++) {
         threeLSB[2 - i] = *(((uint8_t*)&n) + i); // Note uint32_t is little endian
     }
@@ -198,13 +198,16 @@ void FLASH_ReadJEDECID(void)
 }
 
 // Transfers data in a page to the flash memory's data buffer
-void FLASH_ReadPage(uint8_t pageAddress[3])
+void FLASH_ReadPage(uint32_t pageAddress)
 {
+  uint8_t truncatedPageAddress[3];
+  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&READ_PAGE, 1, SPI_TIMEOUT);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(pageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
   FLASH_CS_High();
 }
 
@@ -265,26 +268,32 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 }
 
 // Write data in buffer to a page with a 3 byte address (Only up to end of page, extra data discarded)
-void FLASH_WriteExecute(uint8_t pageAddress[3])
+void FLASH_WriteExecute(uint32_t pageAddress)
 {
+  uint8_t truncatedPageAddress[3];
+  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_EXECUTE, 1, SPI_TIMEOUT);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(pageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
   FLASH_CS_High();
 }
 
 //! Erase Operations
 
 // Erase the block which the page at the given address is located within
-void FLASH_EraseBlock(uint8_t pageAddress[3]) {
+void FLASH_EraseBlock(uint32_t pageAddress) {
+  uint8_t truncatedPageAddress[3];
+  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&ERASE_BLOCK, 1, SPI_TIMEOUT);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(pageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
   FLASH_CS_High();
 }
 
