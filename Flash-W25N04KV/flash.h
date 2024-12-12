@@ -40,5 +40,6 @@ void FLASH_WriteExecute(uint8_t *pageAddress);
 // Erase Functions
 void FLASH_EraseBlock(uint8_t pageAddress[3]);
 void FLASH_ResetDevice(void);
+void FLASH_EraseDevice(void);
 
 #endif /* FLASH_H_ */

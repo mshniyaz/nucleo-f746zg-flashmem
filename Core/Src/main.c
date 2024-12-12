@@ -107,7 +107,7 @@ int main(void)
   
   // TODO: Testing writes
   // Define some constants
-  uint8_t data[4] = {0x40, 0x30, 0x20, 0x10};
+  uint8_t data[4] = {0xAA, 0xBB, 0xCC, 0xDD};
   uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
   // Begin test

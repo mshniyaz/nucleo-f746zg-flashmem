@@ -102,6 +102,19 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
   memcpy(buf, response, size);
 }
 
+// Convenience functions for splitting uint32_t (little indian) into 3 least significant bytes
+void getThreeLSB(uint32_t n, uint8_t* threeLSB) {
+    for (int i = 0; i <= 2; i++) {
+        threeLSB[2 - i] = *(((uint8_t*)&n) + i); // Note uint32_t is little endian
+    }
+}
+
+// Convert uint16_t to a big endian byte array
+void uint16ToByteArray(uint16_t n, uint8_t* byteArray) {
+  byteArray[0] = (n >> 8) & 0xFF;
+  byteArray[1] = n & 0xFF;
+}
+
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
@@ -199,12 +212,14 @@ void FLASH_ReadPage(uint8_t pageAddress[3])
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
 {
   uint8_t readResponse[size];
+  uint8_t columnAddressByteArray[2];
+  uint16ToByteArray(columnAddress, columnAddressByteArray);
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&READ_BUFFER, 1, SPI_TIMEOUT);
   // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(&columnAddress, 2, SPI_TIMEOUT);
+  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT);
   FLASH_DummyClock();
   FLASH_Receive(readResponse, size, SPI_TIMEOUT);
   FLASH_CS_High();
@@ -236,11 +251,15 @@ void FLASH_WriteEnable(void)
 // Write to the flash memory's data buffer
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
+  uint8_t readResponse[size];
+  uint8_t columnAddressByteArray[2];
+  uint16ToByteArray(columnAddress, columnAddressByteArray);
+
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_BUFFER, 1, SPI_TIMEOUT);
-  FLASH_Transmit(&columnAddress, 2, SPI_TIMEOUT); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_Transmit(data, size, SPI_TIMEOUT);
   FLASH_CS_High();
 }
@@ -269,7 +288,7 @@ void FLASH_EraseBlock(uint8_t pageAddress[3]) {
   FLASH_CS_High();
 }
 
-// Reset all pages in the flash memory to 0xFF, and disable write protection
+// Resets device software and disables write protection
 void FLASH_ResetDevice(void)
 {
   FLASH_AwaitNotBusy();
@@ -278,4 +297,10 @@ void FLASH_ResetDevice(void)
   FLASH_CS_High();
 
   FLASH_DisableWriteProtect();
+}
+
+// Resets entire memory of flash memory to 0xFF
+// TODO: Impelement this function after pageAddress is converted to uint32_t
+void FLASH_EraseDevice(void) {
+  // There are 262144 (2^18) pages, iterate to 2^18-1 and erase
 }
