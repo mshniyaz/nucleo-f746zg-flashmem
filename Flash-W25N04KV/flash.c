@@ -308,8 +308,10 @@ void FLASH_ResetDevice(void)
   FLASH_DisableWriteProtect();
 }
 
-// Resets entire memory of flash memory to 0xFF
-// TODO: Impelement this function after pageAddress is converted to uint32_t
+// Resets entire memory array of flash to 0xFF, for testing only
 void FLASH_EraseDevice(void) {
-  // There are 262144 (2^18) pages, iterate to 2^18-1 and erase
+  // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
+  for (int i=0; i<0x3FFFF; i+=64) {
+    FLASH_EraseBlock(i);
+  }
 }

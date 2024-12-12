@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -104,24 +104,25 @@ int main(void)
   FLASH_ReadJEDECID();
   FLASH_ResetDevice(); //! Reset entire device to test
   HAL_Delay(1000);
-  
+  FLASH_EraseDevice();
+
   // TODO: Testing writes
   // Define some constants
   uint8_t data[4] = {0xAA, 0xBB, 0xCC, 0xDD};
   uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
   // Begin test
-  FLASH_EraseBlock(1); // 0xD8
   FLASH_ReadBuffer(0x00, 4); // Should be empty
   FLASH_WriteBuffer(data, 4, 0x00);
   FLASH_ReadBuffer(0x00, 4); // Should be filled with data
   FLASH_WriteExecute(pageAddress1);
   FLASH_ReadBuffer(0x00, 4); // Should be empty after writing to main array
-  FLASH_ReadPage(pageAddress1); 
+  FLASH_ReadPage(pageAddress1);
   FLASH_ReadBuffer(0x00, 4); // Should be filled after reading
   FLASH_ReadBuffer(0x01, 4); // Should be shifted right by 1 bit
-  FLASH_ReadPage(pageAddress0); 
+  FLASH_ReadPage(pageAddress0);
   FLASH_ReadBuffer(0x00, 4); // Should be empty
+
   
   /* USER CODE END 2 */
 
@@ -130,6 +131,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
