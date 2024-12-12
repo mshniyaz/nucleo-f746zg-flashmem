@@ -258,6 +258,17 @@ void FLASH_WriteExecute(uint8_t pageAddress[3])
 
 //! Erase Operations
 
+// Erase the block which the page at the given address is located within
+void FLASH_EraseBlock(uint8_t pageAddress[3]) {
+  FLASH_WriteEnable();
+  FLASH_AwaitNotBusy();
+  FLASH_CS_Low();
+  FLASH_Transmit(&ERASE_BLOCK, 1, SPI_TIMEOUT);
+  // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
+  FLASH_Transmit(pageAddress, 3, SPI_TIMEOUT);
+  FLASH_CS_High();
+}
+
 // Reset all pages in the flash memory to 0xFF, and disable write protection
 void FLASH_ResetDevice(void)
 {

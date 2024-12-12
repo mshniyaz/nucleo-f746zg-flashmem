@@ -38,6 +38,7 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 void FLASH_WriteExecute(uint8_t *pageAddress);
 
 // Erase Functions
+void FLASH_EraseBlock(uint8_t pageAddress[3]);
 void FLASH_ResetDevice(void);
 
 #endif /* FLASH_H_ */

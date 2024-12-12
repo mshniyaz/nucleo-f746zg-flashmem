@@ -102,22 +102,26 @@ int main(void)
   /* USER CODE BEGIN 2 */
   FLASH_CS_High(); // CS pin should be default high
   FLASH_ReadJEDECID();
-  
   FLASH_ResetDevice(); //! Reset entire device to test
+  HAL_Delay(1000);
+  
   // TODO: Testing writes
   // Define some constants
-  uint8_t data[4] = {0x32, 0xBA, 0x15, 0xCB};
+  uint8_t data[4] = {0x40, 0x30, 0x20, 0x10};
   uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
-  FLASH_ReadBuffer(0x00, 4); // Should be 0x00 empty
+  // Begin test
+  FLASH_EraseBlock(pageAddress0);
+  FLASH_ReadBuffer(0x00, 4); // Should be empty
   FLASH_WriteBuffer(data, 4, 0x00);
   FLASH_ReadBuffer(0x00, 4); // Should be filled with data
   FLASH_WriteExecute(pageAddress1);
   FLASH_ReadBuffer(0x00, 4); // Should be empty after writing to main array
   FLASH_ReadPage(pageAddress1); 
   FLASH_ReadBuffer(0x00, 4); // Should be filled after reading
-  FLASH_ReadPage(pageAddress0);
-  FLASH_ReadBuffer(0x00, 4); // Should be empty after reading from different page
+  FLASH_ReadBuffer(0x01, 4); // Should be shifted right by 1 bit
+  FLASH_ReadPage(pageAddress0); 
+  FLASH_ReadBuffer(0x00, 4); // Should be empty
   
   /* USER CODE END 2 */
 
