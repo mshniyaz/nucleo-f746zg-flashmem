@@ -20,6 +20,7 @@ extern UART_HandleTypeDef huart3;
 
 // General functions
 void UART_Printf(const char *format, ...);
+void UART_ListenInput(void);
 
 // Status Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
