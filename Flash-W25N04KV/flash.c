@@ -41,15 +41,16 @@ char *UART_ListenInput(void)
   uint8_t index = 0;
   uint16_t bufferSize = 10;
   char *commandBuffer = (char *)malloc(bufferSize);
-
+  
   if (commandBuffer == NULL)
   {
     // Handle malloc failure
     UART_Printf("Failed to allocate memory for command buffer");
     return NULL;
   }
+  
 
-  while (1)
+  while (true)
   {
     // Receive one byte
     if (HAL_UART_Receive(&huart3, &receivedByte, 1, HAL_MAX_DELAY) == HAL_OK)
@@ -65,7 +66,7 @@ char *UART_ListenInput(void)
         if (index > 0)
         {
           index--;
-          UART_Printf("\b \b"); // Erase the last character on the terminal // TODO: Check why 2 \b
+          UART_Printf("\b \b"); // Erase the last character on the terminal
         }
       }
       else

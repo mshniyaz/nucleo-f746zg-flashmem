@@ -128,7 +128,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   FLASH_CS_High(); // CS pin should be default high
-  // FLASH_ReadJEDECID();
+  FLASH_ReadJEDECID();
   FLASH_ResetDevice(); //! Reset entire device to test
   // HAL_Delay(1000);
   // FLASH_EraseDevice();
@@ -492,13 +492,8 @@ void listenCommands(void *argument)
   /* Infinite loop */
   for (;;)
   {
-    UART_Printf("Listening Commands\r\n");
-    osDelay(1000);
-    // while (true)
-    // {
-    //   // Listen for commands (non-blocking)
-    //   FLASH_ListenCommands();
-    // }
+    FLASH_ListenCommands();
+    osDelay(10);
   }
 
   // In case we accidentally exit from task loop
@@ -520,7 +515,7 @@ void testJEDECID(void *argument)
   for (;;)
   {
     UART_Printf("Reading JEDEC ID\r\n");
-    osDelay(1000);
+    osDelay(10000);
   }
 
   // In case we accidentally exit from task loop
@@ -542,7 +537,7 @@ void testBufferRead(void *argument)
   for (;;)
   {
     UART_Printf("Reading Buffer\r\n");
-    osDelay(1000);
+    osDelay(10000);
   }
 
   // In case we accidentally exit from task loop
