@@ -55,20 +55,6 @@ const osThreadAttr_t ListenCommands_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
-/* Definitions for TestJEDECID */
-osThreadId_t TestJEDECIDHandle;
-const osThreadAttr_t TestJEDECID_attributes = {
-  .name = "TestJEDECID",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for TestBufferRead */
-osThreadId_t TestBufferReadHandle;
-const osThreadAttr_t TestBufferRead_attributes = {
-  .name = "TestBufferRead",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal1,
-};
 /* Definitions for commandQueue */
 osMessageQueueId_t commandQueueHandle;
 const osMessageQueueAttr_t commandQueue_attributes = {
@@ -84,8 +70,6 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_SPI1_Init(void);
 void listenCommands(void *argument);
-void testJEDECID(void *argument);
-void testBufferRead(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -178,12 +162,6 @@ int main(void)
   /* Create the thread(s) */
   /* creation of ListenCommands */
   ListenCommandsHandle = osThreadNew(listenCommands, NULL, &ListenCommands_attributes);
-
-  /* creation of TestJEDECID */
-  TestJEDECIDHandle = osThreadNew(testJEDECID, NULL, &TestJEDECID_attributes);
-
-  /* creation of TestBufferRead */
-  TestBufferReadHandle = osThreadNew(testBufferRead, NULL, &TestBufferRead_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -493,56 +471,12 @@ void listenCommands(void *argument)
   for (;;)
   {
     FLASH_ListenCommands();
-    osDelay(10);
+    osDelay(1);
   }
 
   // In case we accidentally exit from task loop
   osThreadTerminate(NULL);
   /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_testJEDECID */
-/**
- * @brief Function implementing the TestJEDECID thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_testJEDECID */
-void testJEDECID(void *argument)
-{
-  /* USER CODE BEGIN testJEDECID */
-  /* Infinite loop */
-  for (;;)
-  {
-    UART_Printf("Reading JEDEC ID\r\n");
-    osDelay(10000);
-  }
-
-  // In case we accidentally exit from task loop
-  osThreadTerminate(NULL);
-  /* USER CODE END testJEDECID */
-}
-
-/* USER CODE BEGIN Header_testBufferRead */
-/**
- * @brief Function implementing the TestBufferRead thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_testBufferRead */
-void testBufferRead(void *argument)
-{
-  /* USER CODE BEGIN testBufferRead */
-  /* Infinite loop */
-  for (;;)
-  {
-    UART_Printf("Reading Buffer\r\n");
-    osDelay(10000);
-  }
-
-  // In case we accidentally exit from task loop
-  osThreadTerminate(NULL);
-  /* USER CODE END testBufferRead */
 }
 
 /**

@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 
 #ifndef FLASH_CONSTANTS_H
@@ -37,6 +38,9 @@ static const uint8_t *REGISTERS[] = {
     &REGISTER_TWO,
     &REGISTER_THREE};
 
+// Maximum buffer length for inputs
+static const uint8_t MAX_INPUT_LEN = 100;
+
 // Timeout to use for all SPI communications (in ms)
 static const uint32_t SPI_TIMEOUT = 100;
 #endif /* FLASH_CONSTANTS_H */
@@ -47,7 +51,7 @@ extern UART_HandleTypeDef huart3;
 
 // General functions
 void UART_Printf(const char *format, ...);
-char* UART_ListenInput(void);
+void UART_ListenInput(char* resultBuffer, int* resultLen);
 
 // Status Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);

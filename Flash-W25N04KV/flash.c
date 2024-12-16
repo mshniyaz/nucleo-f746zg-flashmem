@@ -34,21 +34,20 @@ void UART_Printf(const char *format, ...)
   va_end(args);
 }
 
-// Listens for user input and submits when enter is pressed (note: baud rate of uart listener must match)
-char *UART_ListenInput(void)
+// Listens for user input and submits when enter is pressed, storing results in buffers
+void UART_ListenInput(char *resultBuffer, int *resultLen)
 {
   uint8_t receivedByte;
   uint8_t index = 0;
   uint16_t bufferSize = 10;
   char *commandBuffer = (char *)malloc(bufferSize);
-  
+
   if (commandBuffer == NULL)
   {
     // Handle malloc failure
-    UART_Printf("Failed to allocate memory for command buffer");
+    UART_Printf("Failed to allocate memory for command buffer\r\n");
     return NULL;
   }
-  
 
   while (true)
   {
@@ -71,35 +70,59 @@ char *UART_ListenInput(void)
       }
       else
       {
+        // Add character to buffer and print it
+        if (!(index >= MAX_INPUT_LEN))
+        {
+          commandBuffer[index] = receivedByte;
+          UART_Printf("%c", (char)receivedByte);
+          index++;
+        }
+
         // Reallocate memory for command buffer if buffer is full
         if (index >= bufferSize - 1)
         {
           bufferSize += 10;
+          if (bufferSize > MAX_INPUT_LEN)
+          {
+            bufferSize = MAX_INPUT_LEN;
+          }
           commandBuffer = (char *)realloc(commandBuffer, bufferSize);
+          if (commandBuffer == NULL)
+          {
+            UART_Printf("Failed to reallocate memory for command buffer\r\n");
+          }
         }
-
-        // Add character to buffer and print it
-        commandBuffer[index] = receivedByte;
-        UART_Printf("%c", (char)receivedByte);
-        index++;
       }
     }
   }
 
-  // Return the input string
-  return commandBuffer;
+  // Store the inputted string
+  strcpy(resultBuffer, commandBuffer);
+  *resultLen = index;
 }
 
 // Drives Chip Select Low to issue a command
 void FLASH_CS_Low(void)
 {
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+
+  // Verify if the pin state is actually low
+  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_RESET)
+  {
+    UART_Printf("Error: Failed to flash chip select low\r\n");
+  }
 }
 
 // Drives Chip Select High after issuing a command
 void FLASH_CS_High(void)
 {
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+
+  // Verify if the pin state is actually low
+  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_SET)
+  {
+    UART_Printf("Error: Failed to flash chip select high\r\n");
+  }
 }
 
 // Transmits 1 or more bytes of data from master to slave via SPI
@@ -107,16 +130,10 @@ void FLASH_Transmit(uint8_t *data, uint16_t size, uint32_t timeout)
 {
   if (HAL_SPI_Transmit(&hspi1, data, size, timeout) != HAL_OK)
   {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+    UART_Printf("SPI transmit failed\r\n");
+    FLASH_CS_High();
     return;
   }
-}
-
-// Generates a cycle of 8 dummy clocks by transmitting 0x00
-void FLASH_DummyClock(void)
-{
-  uint8_t dummy_byte = 0x00;
-  FLASH_Transmit(&dummy_byte, 1, SPI_TIMEOUT);
 }
 
 // Receive output from the slave (flash memory) via SPI
@@ -125,12 +142,20 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
   uint8_t response[size];
   if (HAL_SPI_Receive(&hspi1, response, size, timeout) != HAL_OK)
   {
+    UART_Printf("SPI receive failed \r\n");
     FLASH_CS_High();
     return;
   }
 
   // Copy received data to the output buffer
   memcpy(buf, response, size);
+}
+
+// Generates a cycle of 8 dummy clocks by transmitting 0x00
+void FLASH_DummyClock(void)
+{
+  uint8_t dummy_byte = 0x00;
+  FLASH_Transmit(&dummy_byte, 1, SPI_TIMEOUT);
 }
 
 // Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
@@ -225,7 +250,7 @@ void FLASH_ReadJEDECID(void)
   FLASH_Receive(jedecResponse, 3, SPI_TIMEOUT);
   FLASH_CS_High();
 
-  // Print JEDEC ID to UART
+  // Print JEDEC ID to UART // TODO: Make this nicer
   UART_Printf("\r\n------------------------------\r\n");
   UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
@@ -247,6 +272,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
+// TODO: Actually read into a buffer value
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
 {
   uint8_t readResponse[size];
