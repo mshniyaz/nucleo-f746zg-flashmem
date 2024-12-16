@@ -5,13 +5,16 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Flash-W25N04KV/flash.c 
+../Flash-W25N04KV/flash.c \
+../Flash-W25N04KV/test.c 
 
 OBJS += \
-./Flash-W25N04KV/flash.o 
+./Flash-W25N04KV/flash.o \
+./Flash-W25N04KV/test.o 
 
 C_DEPS += \
-./Flash-W25N04KV/flash.d 
+./Flash-W25N04KV/flash.d \
+./Flash-W25N04KV/test.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -21,7 +24,7 @@ Flash-W25N04KV/%.o Flash-W25N04KV/%.su Flash-W25N04KV/%.cyclo: ../Flash-W25N04KV
 clean: clean-Flash-2d-W25N04KV
 
 clean-Flash-2d-W25N04KV:
-	-$(RM) ./Flash-W25N04KV/flash.cyclo ./Flash-W25N04KV/flash.d ./Flash-W25N04KV/flash.o ./Flash-W25N04KV/flash.su
+	-$(RM) ./Flash-W25N04KV/flash.cyclo ./Flash-W25N04KV/flash.d ./Flash-W25N04KV/flash.o ./Flash-W25N04KV/flash.su ./Flash-W25N04KV/test.cyclo ./Flash-W25N04KV/test.d ./Flash-W25N04KV/test.o ./Flash-W25N04KV/test.su
 
 .PHONY: clean-Flash-2d-W25N04KV
 

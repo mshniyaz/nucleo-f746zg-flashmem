@@ -7,30 +7,6 @@
 
 #include "flash.h"
 
-// Instruction Set Constants
-const uint8_t RESET_DEVICE = 0xFF;
-const uint8_t GET_JEDEC = 0x9F;
-const uint8_t READ_REGISTER = 0x0F;
-const uint8_t WRITE_REGISTER = 0x01;
-const uint8_t READ_PAGE = 0x13;
-const uint8_t READ_BUFFER = 0x03;
-const uint8_t WRITE_ENABLE = 0x06;
-const uint8_t WRITE_BUFFER = 0x84; //! Unused bits in data buffer not erased
-const uint8_t WRITE_EXECUTE = 0x10;
-const uint8_t ERASE_BLOCK = 0xD8;
-
-// Addresses of 3 status registers
-const uint8_t REGISTER_ONE = 0xA0;
-const uint8_t REGISTER_TWO = 0xB0;
-const uint8_t REGISTER_THREE = 0xC0;
-const uint8_t *REGISTERS[] = {
-    &REGISTER_ONE,
-    &REGISTER_TWO,
-    &REGISTER_THREE};
-
-// Timeout to use for all SPI communications (in ms)
-const uint32_t SPI_TIMEOUT = 100;
-
 //! General Operations
 
 // Prints a string of arbitrary size via UART
@@ -59,12 +35,19 @@ void UART_Printf(const char *format, ...)
 }
 
 // Listens for user input and submits when enter is pressed (note: baud rate of uart listener must match)
-void UART_ListenInput(void)
+char *UART_ListenInput(void)
 {
   uint8_t receivedByte;
   uint8_t index = 0;
   uint16_t bufferSize = 10;
-  char *commandBuffer = (char *)malloc(bufferSize); // Max command length of 50
+  char *commandBuffer = (char *)malloc(bufferSize);
+
+  if (commandBuffer == NULL)
+  {
+    // Handle malloc failure
+    UART_Printf("Failed to allocate memory for command buffer");
+    return NULL;
+  }
 
   while (1)
   {
@@ -74,8 +57,6 @@ void UART_ListenInput(void)
       if (receivedByte == 0x0D) // Enter
       {
         commandBuffer[index] = '\0';
-        UART_Printf("\r\n");
-        UART_Printf(commandBuffer);
         UART_Printf("\r\n");
         break;
       }
@@ -103,6 +84,9 @@ void UART_ListenInput(void)
       }
     }
   }
+
+  // Return the input string
+  return commandBuffer;
 }
 
 // Drives Chip Select Low to issue a command
