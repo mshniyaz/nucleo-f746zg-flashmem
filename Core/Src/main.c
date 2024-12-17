@@ -116,25 +116,24 @@ int main(void)
   FLASH_ReadJEDECID();
   FLASH_ResetDevice(); //! Reset entire device to test
   
-  
-
   // // TODO: Testing writes
   // // Define some constants
   // uint8_t data[4] = {0xAA, 0xBB, 0xCC, 0xDD};
   // uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   // uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
+  // uint8_t readBuf[4];
   // // Begin test
   // FLASH_EraseDevice();
-  // FLASH_ReadBuffer(0x00, 4); // Should be empty
+  // FLASH_ReadBuffer(0x00, 4, readBuf); // Should be empty
   // FLASH_WriteBuffer(data, 4, 0x00);
-  // FLASH_ReadBuffer(0x00, 4); // Should be filled with data
+  // FLASH_ReadBuffer(0x00, 4, readBuf); // Should be filled with data
   // FLASH_WriteExecute(pageAddress1);
-  // FLASH_ReadBuffer(0x00, 4); // Should be empty after writing to main array
+  // FLASH_ReadBuffer(0x00, 4, readBuf); // Should be empty after writing to main array
   // FLASH_ReadPage(pageAddress1);
-  // FLASH_ReadBuffer(0x00, 4); // Should be filled after reading
-  // FLASH_ReadBuffer(0x01, 4); // Should be shifted right by 1 bit
+  // FLASH_ReadBuffer(0x00, 4, readBuf); // Should be filled after reading
+  // FLASH_ReadBuffer(0x01, 4, readBuf); // Should be shifted right by 1 bit
   // FLASH_ReadPage(pageAddress0);
-  // FLASH_ReadBuffer(0x00, 4); // Should be empty
+  // FLASH_ReadBuffer(0x00, 4, readBuf); // Should be empty
 
   /* USER CODE END 2 */
 

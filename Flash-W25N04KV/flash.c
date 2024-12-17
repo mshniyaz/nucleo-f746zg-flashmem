@@ -262,10 +262,11 @@ void FLASH_ReadJEDECID(void)
   FLASH_CS_High();
 
   // Print JEDEC ID to UART
-  UART_Printf("\r\nW25N04KV QspiNAND Memory\r\n");
-  UART_Printf("JEDEC ID: 0x%02x 0x%02x 0x%02x",
+  UART_Printf("\r\n------------------------\r\n");
+  UART_Printf("W25N04KV QspiNAND Memory\r\n");
+  UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
-  UART_Printf("\r\n---------------------------\r\n");
+  UART_Printf("\r\n------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer
@@ -284,9 +285,8 @@ void FLASH_ReadPage(uint32_t pageAddress)
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
 // TODO: Actually read into a buffer value
-void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
+void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-  uint8_t readResponse[size];
   uint8_t columnAddressByteArray[2];
   uint16ToByteArray(columnAddress, columnAddressByteArray);
 
@@ -300,17 +300,17 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
   FLASH_CS_High();
 
   UART_Printf("\r\n");
-  for (uint16_t i = 0; i < size; i++)
-  {
-    if (i == 0)
-    {
-      UART_Printf("Buffer Memory: %02x ", readResponse[i]);
-    }
-    else
-    {
-      UART_Printf("%02x ", readResponse[i]);
-    }
-  }
+  // for (uint16_t i = 0; i < size; i++)
+  // {
+  //   if (i == 0)
+  //   {
+  //     UART_Printf("Buffer Memory: %02x ", readResponse[i]);
+  //   }
+  //   else
+  //   {
+  //     UART_Printf("%02x ", readResponse[i]);
+  //   }
+  // }
 }
 
 //! Write Operations
@@ -383,7 +383,10 @@ void FLASH_ResetDevice(void)
 
 // Resets entire memory array of flash to 0xFF, for testing only
 void FLASH_EraseDevice(void)
-{
+{ 
+  // Erase buffer
+  FLASH_WriteEnable();
+  FLASH_WriteExecute(0);
   // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
   for (int i = 0; i < 0x3FFFF; i += 64)
   {

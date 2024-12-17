@@ -57,6 +57,10 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     {
         UART_Printf("HELP NOT IMPLEMENTED YET SRY\r\n");
     }
+    else if (strcmp(cmd, "reset-device") == 0)
+    {
+        FLASH_ResetDeviceCmd();
+    }
     else if (strcmp(cmd, "read-write-test") == 0) // Test reads and writes
     {
         UART_Printf("Testing read and write capabilities\r\n");
@@ -76,9 +80,20 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     }
 }
 
+// Handle command to reset entire device
+void FLASH_ResetDeviceCmd(void) {
+    UART_Printf("Performing software reset, changing registers to default\r\n");
+    UART_Printf("Disabled write protection for all blocks\r\n");
+    FLASH_ResetDevice();
+    UART_Printf("Erasing all blocks of device\r\n");
+    FLASH_EraseDevice();
+    UART_Printf("Erase complete\r\n");
+}
+
+// Perform sequence to test reads and writes
 void FLASH_TestReadWrite(uint8_t testPattern[4])
 {
-    return 0;
+    UART_Printf("Checking current buffer data");
 }
 
 void FLASH_TestErase(uint8_t testPattern[4])

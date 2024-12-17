@@ -62,7 +62,7 @@ void FLASH_DisableWriteProtect(void);
 // Read functions
 void FLASH_ReadJEDECID(void);
 void FLASH_ReadPage(uint32_t pageAddress);
-void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size);
+void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 // Write Functions
 void FLASH_WriteEnable(void);
