@@ -229,7 +229,7 @@ void FLASH_AwaitNotBusy(void)
 {
   while (FLASH_IsBusy())
   {
-    HAL_Delay(1); // Short delays of 1ms
+    HAL_Delay(10); // Short delays of 10ms
   }
 }
 
@@ -284,7 +284,6 @@ void FLASH_ReadPage(uint32_t pageAddress)
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
-// TODO: Actually read into a buffer value
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
   uint8_t columnAddressByteArray[2];
@@ -298,19 +297,6 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
   FLASH_DummyClock();
   FLASH_Receive(readResponse, size);
   FLASH_CS_High();
-
-  UART_Printf("\r\n");
-  // for (uint16_t i = 0; i < size; i++)
-  // {
-  //   if (i == 0)
-  //   {
-  //     UART_Printf("Buffer Memory: %02x ", readResponse[i]);
-  //   }
-  //   else
-  //   {
-  //     UART_Printf("%02x ", readResponse[i]);
-  //   }
-  // }
 }
 
 //! Write Operations
@@ -385,11 +371,12 @@ void FLASH_ResetDevice(void)
 void FLASH_EraseDevice(void)
 { 
   // Erase buffer
-  FLASH_WriteEnable();
-  FLASH_WriteExecute(0);
+  uint8_t emptyBuffer[2024] = {0xFF};
+  FLASH_WriteBuffer(emptyBuffer, 2024, 0);
   // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
-  for (int i = 0; i < 0x3FFFF; i += 64)
+  for (int i = 0; i < 0x3FFFF; i+=64)
   {
     FLASH_EraseBlock(i);
+    HAL_Delay(10); // Maxmimum possible erase time
   }
 }
