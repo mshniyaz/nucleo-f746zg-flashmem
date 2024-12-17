@@ -41,8 +41,8 @@ static const uint8_t *REGISTERS[] = {
 // Maximum buffer length for inputs
 static const uint8_t MAX_INPUT_LEN = 100;
 
-// Timeout to use for all SPI communications (in ms)
-static const uint32_t SPI_TIMEOUT = 100;
+// Timeout to use for all communications (in ms)
+static const uint32_t COM_TIMEOUT = 100;
 #endif /* FLASH_CONSTANTS_H */
 
 // SPI and UART handling types, must be defined in main.c
@@ -51,7 +51,7 @@ extern UART_HandleTypeDef huart3;
 
 // General functions
 void UART_Printf(const char *format, ...);
-void UART_ListenInput(char* resultBuffer, int* resultLen);
+void UART_ListenInput(char *resultBuffer, int *resultLen);
 
 // Status Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);

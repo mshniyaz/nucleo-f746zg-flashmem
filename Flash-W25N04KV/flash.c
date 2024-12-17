@@ -19,19 +19,30 @@ void UART_Printf(const char *format, ...)
   // Start variadic argument processing
   va_start(args, format);
   UARTBufLen = vsnprintf(NULL, 0, format, args) + 1; // Calc required buffer length (+1 for null terminator)
-  UARTBuf = (char *)malloc(UARTBufLen);
-  if (UARTBuf == NULL)
+
+  // Check for error in `vsnprintf`
+  if (UARTBufLen <= 0)
   {
     va_end(args);
     return;
   }
 
-  // Transmit the string using UART
-  vsnprintf(UARTBuf, UARTBufLen, format, args);
-  HAL_UART_Transmit(&huart3, (uint8_t *)UARTBuf, UARTBufLen - 1, SPI_TIMEOUT); // -1 to exclude the null terminator
-  free(UARTBuf);
-  // End variadic argument processing
+  UARTBuf = (char *)malloc(UARTBufLen);
+  if (UARTBuf == NULL)
+  {
+    va_end(args);
+    return; // Handle memory allocation failure
+  }
+
+  // Reset args and format the string into the allocated buffer (reset va_list first)
   va_end(args);
+  va_start(args, format);
+  vsnprintf(UARTBuf, UARTBufLen, format, args);
+  va_end(args);
+
+  // Transmit the string using UART
+  HAL_UART_Transmit(&huart3, (uint8_t *)UARTBuf, UARTBufLen - 1, COM_TIMEOUT);
+  free(UARTBuf); // Free allocated memory
 }
 
 // Listens for user input and submits when enter is pressed, storing results in buffers
@@ -126,9 +137,9 @@ void FLASH_CS_High(void)
 }
 
 // Transmits 1 or more bytes of data from master to slave via SPI
-void FLASH_Transmit(uint8_t *data, uint16_t size, uint32_t timeout)
+void FLASH_Transmit(uint8_t *data, uint16_t size)
 {
-  if (HAL_SPI_Transmit(&hspi1, data, size, timeout) != HAL_OK)
+  if (HAL_SPI_Transmit(&hspi1, data, size, COM_TIMEOUT) != HAL_OK)
   {
     UART_Printf("SPI transmit failed\r\n");
     FLASH_CS_High();
@@ -137,10 +148,10 @@ void FLASH_Transmit(uint8_t *data, uint16_t size, uint32_t timeout)
 }
 
 // Receive output from the slave (flash memory) via SPI
-void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
+void FLASH_Receive(uint8_t *buf, uint16_t size)
 {
   uint8_t response[size];
-  if (HAL_SPI_Receive(&hspi1, response, size, timeout) != HAL_OK)
+  if (HAL_SPI_Receive(&hspi1, response, size, COM_TIMEOUT) != HAL_OK)
   {
     UART_Printf("SPI receive failed \r\n");
     FLASH_CS_High();
@@ -155,7 +166,7 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
 void FLASH_DummyClock(void)
 {
   uint8_t dummy_byte = 0x00;
-  FLASH_Transmit(&dummy_byte, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&dummy_byte, 1);
 }
 
 // Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
@@ -183,16 +194,16 @@ uint8_t FLASH_ReadRegister(int registerNo)
 
   // Carry out the read instruction
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_REGISTER, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_REGISTER, 1);
   if (registerNo >= 1 && registerNo <= 3)
   {
-    FLASH_Transmit(REGISTERS[registerNo - 1], 1, SPI_TIMEOUT);
+    FLASH_Transmit(REGISTERS[registerNo - 1], 1);
   }
   else
   {
-    FLASH_Transmit(REGISTERS[2], 1, SPI_TIMEOUT); // Get status register by deafult
+    FLASH_Transmit(REGISTERS[2], 1); // Get status register by deafult
   }
-  FLASH_Receive(registerResponse, 1, SPI_TIMEOUT);
+  FLASH_Receive(registerResponse, 1);
   FLASH_CS_High();
   return registerResponse[0];
 }
@@ -228,9 +239,9 @@ void FLASH_DisableWriteProtect(void)
   uint8_t newRegValue = 0x00; // Set all bits to zero
 
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_REGISTER, 1, SPI_TIMEOUT);
-  FLASH_Transmit(REGISTERS[0], 1, SPI_TIMEOUT);
-  FLASH_Transmit(&newRegValue, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_REGISTER, 1);
+  FLASH_Transmit(REGISTERS[0], 1);
+  FLASH_Transmit(&newRegValue, 1);
   FLASH_CS_High();
 }
 
@@ -243,18 +254,18 @@ void FLASH_ReadJEDECID(void)
 
   // Send JEDEC ID opcode
   FLASH_CS_Low();
-  FLASH_Transmit(&GET_JEDEC, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&GET_JEDEC, 1);
   FLASH_DummyClock();
 
   // Receive 3 bytes (JEDEC ID)
-  FLASH_Receive(jedecResponse, 3, SPI_TIMEOUT);
+  FLASH_Receive(jedecResponse, 3);
   FLASH_CS_High();
 
-  // Print JEDEC ID to UART // TODO: Make this nicer
-  UART_Printf("\r\n------------------------------\r\n");
-  UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
+  // Print JEDEC ID to UART
+  UART_Printf("\r\nW25N04KV QspiNAND Memory\r\n");
+  UART_Printf("JEDEC ID: 0x%02x 0x%02x 0x%02x",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
-  UART_Printf("\r\n------------------------------\r\n");
+  UART_Printf("\r\n---------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer
@@ -265,9 +276,9 @@ void FLASH_ReadPage(uint32_t pageAddress)
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_PAGE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_PAGE, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
 }
 
@@ -281,11 +292,11 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_BUFFER, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_BUFFER, 1);
   // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT);
+  FLASH_Transmit(columnAddressByteArray, 2);
   FLASH_DummyClock();
-  FLASH_Receive(readResponse, size, SPI_TIMEOUT);
+  FLASH_Receive(readResponse, size);
   FLASH_CS_High();
 
   UART_Printf("\r\n");
@@ -308,7 +319,7 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
 void FLASH_WriteEnable(void)
 {
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_ENABLE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_ENABLE, 1);
   FLASH_CS_High();
 }
 
@@ -322,9 +333,9 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_BUFFER, 1, SPI_TIMEOUT);
-  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT); // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(data, size, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_BUFFER, 1);
+  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(data, size);
   FLASH_CS_High();
 }
 
@@ -336,9 +347,9 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_EXECUTE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_EXECUTE, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
 }
 
@@ -353,9 +364,9 @@ void FLASH_EraseBlock(uint32_t pageAddress)
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&ERASE_BLOCK, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&ERASE_BLOCK, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
 }
 
@@ -364,7 +375,7 @@ void FLASH_ResetDevice(void)
 {
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&RESET_DEVICE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&RESET_DEVICE, 1);
   FLASH_CS_High();
 
   FLASH_DisableWriteProtect();

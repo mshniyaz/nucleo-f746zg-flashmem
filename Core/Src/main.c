@@ -112,10 +112,11 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   FLASH_CS_High(); // CS pin should be default high
+  HAL_Delay(2000);
   FLASH_ReadJEDECID();
   FLASH_ResetDevice(); //! Reset entire device to test
-  // HAL_Delay(1000);
-  // FLASH_EraseDevice();
+  
+  
 
   // // TODO: Testing writes
   // // Define some constants
@@ -123,6 +124,7 @@ int main(void)
   // uint8_t pageAddress0[3] = {0x00, 0x00, 0x00};
   // uint8_t pageAddress1[3] = {0x00, 0x00, 0x01};
   // // Begin test
+  // FLASH_EraseDevice();
   // FLASH_ReadBuffer(0x00, 4); // Should be empty
   // FLASH_WriteBuffer(data, 4, 0x00);
   // FLASH_ReadBuffer(0x00, 4); // Should be filled with data
