@@ -51,14 +51,12 @@ extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart3;
 
 // General functions
-void UART_Printf(const char *format, ...);
 void UART_ListenInput(char *resultBuffer, int *resultLen);
 
 // Status Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
 bool FLASH_IsBusy(void);
 bool FLASH_IsWEL(void);
-void FLASH_DisableWriteProtect(void);
 
 // Read functions
 void FLASH_ReadJEDECID(void);

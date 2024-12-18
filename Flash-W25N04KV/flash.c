@@ -9,42 +9,6 @@
 
 //! General Operations
 
-// Prints a string of arbitrary size via UART
-void UART_Printf(const char *format, ...)
-{
-  va_list args;
-  int UARTBufLen;
-  char *UARTBuf;
-
-  // Start variadic argument processing
-  va_start(args, format);
-  UARTBufLen = vsnprintf(NULL, 0, format, args) + 1; // Calc required buffer length (+1 for null terminator)
-
-  // Check for error in `vsnprintf`
-  if (UARTBufLen <= 0)
-  {
-    va_end(args);
-    return;
-  }
-
-  UARTBuf = (char *)malloc(UARTBufLen);
-  if (UARTBuf == NULL)
-  {
-    va_end(args);
-    return; // Handle memory allocation failure
-  }
-
-  // Reset args and format the string into the allocated buffer (reset va_list first)
-  va_end(args);
-  va_start(args, format);
-  vsnprintf(UARTBuf, UARTBufLen, format, args);
-  va_end(args);
-
-  // Transmit the string using UART
-  HAL_UART_Transmit(&huart3, (uint8_t *)UARTBuf, UARTBufLen - 1, COM_TIMEOUT);
-  free(UARTBuf); // Free allocated memory
-}
-
 // Drives Chip Select Low to issue a command
 void FLASH_CS_Low(void)
 {
@@ -53,7 +17,7 @@ void FLASH_CS_Low(void)
   // Verify if the pin state is actually low
   if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_RESET)
   {
-    UART_Printf("Error: Failed to flash chip select low\r\n");
+    printf("Error: Failed to flash chip select low\r\n");
   }
 }
 
@@ -65,7 +29,7 @@ void FLASH_CS_High(void)
   // Verify if the pin state is actually low
   if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_SET)
   {
-    UART_Printf("Error: Failed to flash chip select high\r\n");
+    printf("Error: Failed to flash chip select high\r\n");
   }
 }
 
@@ -74,7 +38,7 @@ void FLASH_Transmit(uint8_t *data, uint16_t size)
 {
   if (HAL_SPI_Transmit(&hspi1, data, size, COM_TIMEOUT) != HAL_OK)
   {
-    UART_Printf("SPI transmit failed\r\n");
+    printf("SPI transmit failed\r\n");
     FLASH_CS_High();
     return;
   }
@@ -86,7 +50,7 @@ void FLASH_Receive(uint8_t *buf, uint16_t size)
   uint8_t response[size];
   if (HAL_SPI_Receive(&hspi1, response, size, COM_TIMEOUT) != HAL_OK)
   {
-    UART_Printf("SPI receive failed \r\n");
+    printf("SPI receive failed \r\n");
     FLASH_CS_High();
     return;
   }
@@ -195,11 +159,11 @@ void FLASH_ReadJEDECID(void)
   FLASH_CS_High();
 
   // Print JEDEC ID to UART
-  UART_Printf("\r\n------------------------\r\n");
-  UART_Printf("W25N04KV QspiNAND Memory\r\n");
-  UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
+  printf("\r\n------------------------\r\n");
+  printf("W25N04KV QspiNAND Memory\r\n");
+  printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
-  UART_Printf("\r\n------------------------\r\n");
+  printf("\r\n------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer

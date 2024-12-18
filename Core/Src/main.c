@@ -93,6 +93,8 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+  __HAL_DBGMCU_FREEZE_TIM6();  // Freeze TIM6 during debug halt
+  setvbuf(stdout, NULL, _IONBF, 0);  //! Disable buffering for stdout (May affect performance?)
 
   /* USER CODE BEGIN Init */
 
