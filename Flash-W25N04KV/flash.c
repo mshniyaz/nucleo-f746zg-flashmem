@@ -250,9 +250,17 @@ void FLASH_EraseBuffer(void) {
   FLASH_CS_High();
 }
 
-// Erase the block which the page at the given address is located within
-void FLASH_EraseBlock(uint32_t pageAddress)
-{
+// Erase the block at the given block address (between 0 and 4095)
+void FLASH_EraseBlock(uint32_t blockAddress)
+{ 
+  // Verify input
+  if (blockAddress >= 4096) {
+    printf("Attempted to erase invalid block %d", blockAddress);
+    return;
+  }
+
+  // FInd page address
+  uint32_t pageAddress = blockAddress * 64; // Address of first page in block
   uint8_t truncatedPageAddress[3];
   uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
 
@@ -278,8 +286,8 @@ void FLASH_ResetDeviceSoftware(void)
 // Resets entire memory array of flash to 0xFF, and also reset software
 void FLASH_EraseDevice(void)
 {
-  // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
-  for (int i = 0; i < 0x3FFFF; i += 64)
+  // There are 40
+  for (int i = 0; i < 4096; i ++)
   {
     FLASH_EraseBlock(i);
     HAL_Delay(10); // Maxmimum possible erase time
