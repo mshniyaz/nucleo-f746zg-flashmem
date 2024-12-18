@@ -115,11 +115,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_Delay(3000);
   FLASH_ReadJEDECID();
-  FLASH_ResetDevice();
+  FLASH_ResetDeviceSoftware();
 
-  //! Reset device for testing only
+  //! Testing code
   // FLASH_EraseDevice();
-
   // // TODO: Testing writes
   // // Define some constants
   // uint8_t readResponse[4];

@@ -117,9 +117,9 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     {
         FLASH_ResetDeviceCmd();
     }
-    else if (strcmp(cmd, "registers-test") == 0) // Test reads and writes
+    else if (strcmp(cmd, "register-test") == 0) // Test reads and writes
     {
-        FLASH_TestReadWrite(testData);
+        FLASH_TestRegisters();
     }
     else if (strcmp(cmd, "read-write-test") == 0) // Test reads and writes
     {
@@ -144,20 +144,67 @@ void FLASH_ResetDeviceCmd(void)
 {
     printf("\r\nPerforming software reset, changing registers to default\r\n");
     printf("Disabled write protection for all blocks\r\n");
-    FLASH_ResetDevice();
+    FLASH_ResetDeviceSoftware();
     printf("Erasing all blocks of device (this may take a minute)...\r\n");
     FLASH_EraseDevice();
     printf("Erase complete\r\n\n");
     return;
 }
 
-// Perform sequence to test registers
-void FLASH_TestRegisters(void)
+// Perform sequence to test registers, returning success (1) or failure (0)
+int FLASH_TestRegisters(void)
 {
+    uint8_t reg1 = FLASH_ReadRegister(1);
+    uint8_t reg2 = FLASH_ReadRegister(2);
+    uint8_t reg3 = FLASH_ReadRegister(3);
+
+    // Check register 1
+    printf("\r\nChecking register 1 (protection register), expecting 0x00 (All protections disabled)\r\n");
+    printf("Register 1: 0x%02X\r\n", reg1);
+    if (reg1 == 0)
+    {
+        printf("[PASSED] All protections are correctly disabled\r\n\n");
+    }
+    else
+    {
+        printf("[ERROR] Some memory blocks are still protected\r\n\n");
+        return 0;
+    }
+
+    // Check register 2
+    printf("Checking register 2 (configuration register), expecting 0x19 (Default configuration)\r\n");
+    printf("Register 2: 0x%02X\r\n", reg2);
+    if (reg2 == 0x19)
+    {
+        printf("[PASSED] Register 2 retains default configuration\r\n\n");
+    }
+    else
+    {
+        printf("[ERROR] Configurations have been modified\r\n\n");
+        return 0;
+    }
+
+    // Check register 3
+    printf("Checking register 3 (status register), expecting 0x00 (No failures or operations in progress)\r\n");
+    printf("Register 3: 0x%02X\r\n", reg3);
+    if (reg3 == 0)
+    {
+        printf("[PASSED] No failures detected; BUSY and WEL bits are clear as expected\r\n\n");
+    }
+    else
+    {
+        printf("[ERROR] Unexpected register value, possible program or erase failure\r\n");
+        printf("[ERROR] Writes (WEL) may be enabled, or the program may be busy\r\n\n");
+        return 0;
+    }
+
+    // Successfully checked all registers
+    printf("All registers are correctly configured.\r\n\r\n");
+    return 1;
 }
 
-// Perform sequence to test reads and writes
-void FLASH_TestReadWrite(uint8_t testData[4])
+// Perform sequence to test reads and writes, returning a success (1) or failure (0)
+int FLASH_TestReadWrite(uint8_t testData[4])
 {
     uint8_t readResponse[4];
     uint8_t emptyResponse[4] = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -168,7 +215,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     printf("Checking current buffer data\r\n");
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Buffer is empty as expected, continuing with test\r\n\n");
@@ -176,16 +223,16 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Buffer not empty, reset device by running reset-device\r\n\n");
-        return; //! Error here if run as first command
+        return 0;
     }
 
     // Write some data to the buffer
     printf("Writing test data (0x%02X%02X%02X%02X) to buffer at bit position 0x00\r\n",
-                testData[0], testData[1], testData[2], testData[3]);
+           testData[0], testData[1], testData[2], testData[3]);
     FLASH_WriteBuffer(testData, 4, 0);    //! Write to buf
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Buffer successfully filled with required data\r\n\n");
@@ -193,14 +240,14 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Failed to write to the data buffer correctly\r\n\n");
-        return;
+        return 0;
     }
 
     // Read at other positions
     printf("Testing buffer read at data buffer bit address 2 (non-zero), expect 0x%02X%02XFFFF\r\n", readResponse[2], readResponse[3]);
     FLASH_ReadBuffer(2, 4, readResponse); //! Expect bitshifted
     printf("Buffer at bit address 0x02: 0x%02X%02X%02X%02X\r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, bitShiftedResponse, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Buffer is read correctly at non-zero bit addresses\r\n\n");
@@ -208,7 +255,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Failed to read data buffer correctly at a non-zero bit address\r\n\n");
-        return;
+        return 0;
     }
 
     // Execute the write
@@ -216,7 +263,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     FLASH_WriteExecute(5);                //! Write to page 5
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Buffer successfully flushes data when writing to a page\r\n\n");
@@ -224,7 +271,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Buffer fails to flush data when writing to a page\r\n\n");
-        return;
+        return 0;
     }
 
     // Test if other pages are still empty
@@ -232,7 +279,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     FLASH_ReadPage(0);                    //! Read page 0
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Pages which haven't been written to remain empty\r\n\n");
@@ -240,7 +287,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Never wrote to page zero but it is non-empty\r\n\n");
-        return;
+        return 0;
     }
 
     // Test reading of the page
@@ -248,7 +295,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     FLASH_ReadPage(5);                    //! Read page 5
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
-                readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
         printf("[PASSED] Successfully able to write to a page and read it into data buffer\r\n\n");
@@ -256,7 +303,7 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     else
     {
         printf("[ERROR] Failed to write to a page and read it into data buffer\r\n\n");
-        return;
+        return 0;
     }
 
     // Reset pages for next test
@@ -264,12 +311,13 @@ void FLASH_TestReadWrite(uint8_t testData[4])
     FLASH_EraseBuffer();
     FLASH_WriteExecute(5);
     printf("Reset page 5 for next test\r\n\n");
+    return 1;
 }
 
-// TODO: Perform sequence to test erases
-void FLASH_TestErase(uint8_t testData[4])
-{
-    return;
+// TODO: Perform sequence to test erases, return success (1) or failure (0)
+int FLASH_TestErase(uint8_t testData[4])
+{   
+    return 1;
 }
 
 // TODO: Perform sequence to test cycles, accept a parameter input!

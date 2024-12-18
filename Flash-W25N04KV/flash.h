@@ -71,7 +71,7 @@ void FLASH_WriteExecute(uint32_t pageAddress);
 // Erase Functions
 void FLASH_EraseBuffer(void);
 void FLASH_EraseBlock(uint32_t pageAddress);
-void FLASH_ResetDevice(void);
+void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 
 // Testing Functions

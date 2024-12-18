@@ -266,17 +266,16 @@ void FLASH_EraseBlock(uint32_t pageAddress)
 }
 
 // Resets device software and disables write protection
-void FLASH_ResetDevice(void)
+void FLASH_ResetDeviceSoftware(void)
 {
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&RESET_DEVICE, 1);
   FLASH_CS_High();
-
   FLASH_DisableWriteProtect();
 }
 
-// Resets entire memory array of flash to 0xFF, for testing only
+// Resets entire memory array of flash to 0xFF, and also reset software
 void FLASH_EraseDevice(void)
 {
   // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
@@ -286,6 +285,7 @@ void FLASH_EraseDevice(void)
     HAL_Delay(10); // Maxmimum possible erase time
   }
 
-  // Erase buffer
+  // Erase buffer and reset software
   FLASH_EraseBuffer();
+  FLASH_ResetDeviceSoftware();
 }
