@@ -25,7 +25,8 @@ static const uint8_t WRITE_REGISTER = 0x01;
 static const uint8_t READ_PAGE = 0x13;
 static const uint8_t READ_BUFFER = 0x03;
 static const uint8_t WRITE_ENABLE = 0x06;
-static const uint8_t WRITE_BUFFER = 0x84; //! Unused bits in data buffer not erased
+static const uint8_t WRITE_BUFFER = 0x84;
+static const uint8_t WRITE_BUFFER_WITH_RESET = 0x02;
 static const uint8_t WRITE_EXECUTE = 0x10;
 static const uint8_t ERASE_BLOCK = 0xD8;
 
@@ -39,7 +40,7 @@ static const uint8_t *REGISTERS[] = {
     &REGISTER_THREE};
 
 // Maximum buffer length for inputs
-static const uint8_t MAX_INPUT_LEN = 100;
+static const uint8_t MAX_INPUT_LEN = 64; // Must match cmd buffer size
 
 // Timeout to use for all communications (in ms)
 static const uint32_t COM_TIMEOUT = 100;
@@ -70,6 +71,7 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 void FLASH_WriteExecute(uint32_t pageAddress);
 
 // Erase Functions
+void FLASH_EraseBuffer(void);
 void FLASH_EraseBlock(uint32_t pageAddress);
 void FLASH_ResetDevice(void);
 void FLASH_EraseDevice(void);

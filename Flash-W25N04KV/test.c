@@ -7,11 +7,67 @@
 
 #include "flash.h"
 
+// Listens for user input and submits when enter is pressed, storing results in buffers
+void UART_ListenInput(char *inputBuffer, int *inputLen)
+{
+  uint8_t receivedByte;
+  uint8_t index = 0;
+  char commandBuffer[MAX_INPUT_LEN]; //! == {0} here?
+
+  while (true)
+  {
+    // Receive one byte
+    if (HAL_UART_Receive(&huart3, &receivedByte, 1, HAL_MAX_DELAY) == HAL_OK)
+    {
+      if (receivedByte == 0x0D) // Enter
+      {
+        commandBuffer[index] = '\0';
+        UART_Printf("\r\n");
+        break;
+      }
+      else if (receivedByte == 0x08) // Backspace
+      {
+        if (index > 0)
+        {
+          index--;
+          UART_Printf("\b \b"); // Erase the last character on the terminal
+        }
+      }
+      else
+      {
+        // Add character to buffer and print it
+        if (index < MAX_INPUT_LEN - 1)
+        {
+          commandBuffer[index] = receivedByte;
+          UART_Printf("%c", (char)receivedByte);
+          index++;
+        }
+        else
+        {
+          continue;
+        }
+      }
+    }
+  }
+
+  // Copy input to the result buffer safely
+  if (inputBuffer != NULL)
+  {
+    strncpy(inputBuffer, commandBuffer, MAX_INPUT_LEN);
+  }
+
+  // Return input length if resultLen is valid
+  if (inputLen != NULL)
+  {
+    *inputLen = index;
+  }
+}
+
 // Listens for commands transmitted to the MCU via UART for testing the flash
 void FLASH_ListenCommands(void)
 {
     UART_Printf("cmd: ");
-    char cmdBuf[100];
+    char cmdBuf[MAX_INPUT_LEN];
     int cmdLen;
     UART_ListenInput(cmdBuf, &cmdLen);
     // Ensure command is valid
@@ -85,21 +141,18 @@ void FLASH_ResetDeviceCmd(void)
     UART_Printf("\r\nPerforming software reset, changing registers to default\r\n");
     UART_Printf("Disabled write protection for all blocks\r\n");
     FLASH_ResetDevice();
-    UART_Printf("Erasing all blocks of device...\r\n");
+    UART_Printf("Erasing all blocks of device (this may take a minute)...\r\n");
     FLASH_EraseDevice();
-    UART_Printf("Erase complete\r\n\r\n");
+    UART_Printf("Erase complete\r\n\n");
     return;
 }
 
 // Perform sequence to test reads and writes
-// TODO: Test last 2 units to ensure they detect errors
 void FLASH_TestReadWrite(uint8_t testData[4])
 {
     uint8_t readResponse[4];
     uint8_t emptyResponse[4] = {0xFF, 0xFF, 0xFF, 0xFF};
     uint8_t bitShiftedResponse[4] = {testData[2], testData[3], 0xFF, 0xFF};
-
-    uint8_t errorResponse[4] = {1, 2, 3, 4}; // TODO: Remove after func done
 
     // Check if buffer is currently empty
     UART_Printf("\r\nTesting read and write capabilities\r\n");
@@ -109,11 +162,11 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Buffer is empty as expected, continuing with test\r\n\r\n");
+        UART_Printf("[PASSED] Buffer is empty as expected, continuing with test\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Buffer not empty, reset device by running reset-device\r\n\r\n");
+        UART_Printf("[ERROR] Buffer not empty, reset device by running reset-device\r\n\n");
         return; //! Error here if run as first command
     }
 
@@ -126,11 +179,11 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Buffer successfully filled with required data\r\n\r\n");
+        UART_Printf("[PASSED] Buffer successfully filled with required data\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Failed to write to the data buffer correctly\r\n\r\n");
+        UART_Printf("[ERROR] Failed to write to the data buffer correctly\r\n\n");
         return;
     }
 
@@ -141,11 +194,11 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, bitShiftedResponse, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Buffer is read correctly at non-zero bit addresses\r\n\r\n");
+        UART_Printf("[PASSED] Buffer is read correctly at non-zero bit addresses\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Failed to read data buffer correctly at a non-zero bit address\r\n\r\n");
+        UART_Printf("[ERROR] Failed to read data buffer correctly at a non-zero bit address\r\n\n");
         return;
     }
 
@@ -157,11 +210,11 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Buffer successfully flushes data when writing to a page\r\n\r\n");
+        UART_Printf("[PASSED] Buffer successfully flushes data when writing to a page\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Buffer fails to flush data when writing to a page\r\n\r\n");
+        UART_Printf("[ERROR] Buffer fails to flush data when writing to a page\r\n\n");
         return;
     }
 
@@ -173,11 +226,11 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Successfully able to write to a page and read it into data buffer\r\n\r\n");
+        UART_Printf("[PASSED] Successfully able to write to a page and read it into data buffer\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Failed to write to a page and read it into data buffer\r\n\r\n");
+        UART_Printf("[ERROR] Failed to write to a page and read it into data buffer\r\n\n");
         return;
     }
 
@@ -189,23 +242,27 @@ void FLASH_TestReadWrite(uint8_t testData[4])
                 readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
-        UART_Printf("[PASSED] Pages which haven't been written to remain empty\r\n\r\n");
+        UART_Printf("[PASSED] Pages which haven't been written to remain empty\r\n\n");
     }
     else
     {
-        UART_Printf("[ERROR] Never wrote to page zero but it is non-empty\r\n\r\n");
+        UART_Printf("[ERROR] Never wrote to page zero but it is non-empty\r\n\n");
         return;
     }
 
+    // Reset pages for next test
     UART_Printf("All tests passed\r\n");
+    FLASH_EraseBuffer();
+    FLASH_WriteExecute(5);
+    UART_Printf("Reset page 5 for next test\r\n\n");
 }
 
 void FLASH_TestErase(uint8_t testData[4])
 {
-    return 0;
+    return;
 }
 
 void FLASH_TestCycle(uint8_t testData[4])
 {
-    return 0;
+    return;
 }

@@ -45,73 +45,6 @@ void UART_Printf(const char *format, ...)
   free(UARTBuf); // Free allocated memory
 }
 
-// Listens for user input and submits when enter is pressed, storing results in buffers
-void UART_ListenInput(char *resultBuffer, int *resultLen)
-{
-  uint8_t receivedByte;
-  uint8_t index = 0;
-  uint16_t bufferSize = 10;
-  char *commandBuffer = (char *)malloc(bufferSize);
-
-  if (commandBuffer == NULL)
-  {
-    // Handle malloc failure
-    UART_Printf("Failed to allocate memory for command buffer\r\n");
-    return NULL;
-  }
-
-  while (true)
-  {
-    // Receive one byte
-    if (HAL_UART_Receive(&huart3, &receivedByte, 1, HAL_MAX_DELAY) == HAL_OK)
-    {
-      if (receivedByte == 0x0D) // Enter
-      {
-        commandBuffer[index] = '\0';
-        UART_Printf("\r\n");
-        break;
-      }
-      else if (receivedByte == 0x08) // Backspace
-      {
-        if (index > 0)
-        {
-          index--;
-          UART_Printf("\b \b"); // Erase the last character on the terminal
-        }
-      }
-      else
-      {
-        // Add character to buffer and print it
-        if (!(index >= MAX_INPUT_LEN))
-        {
-          commandBuffer[index] = receivedByte;
-          UART_Printf("%c", (char)receivedByte);
-          index++;
-        }
-
-        // Reallocate memory for command buffer if buffer is full
-        if (index >= bufferSize - 1)
-        {
-          bufferSize += 10;
-          if (bufferSize > MAX_INPUT_LEN)
-          {
-            bufferSize = MAX_INPUT_LEN;
-          }
-          commandBuffer = (char *)realloc(commandBuffer, bufferSize);
-          if (commandBuffer == NULL)
-          {
-            UART_Printf("Failed to reallocate memory for command buffer\r\n");
-          }
-        }
-      }
-    }
-  }
-
-  // Store the inputted string
-  strcpy(resultBuffer, commandBuffer);
-  *resultLen = index;
-}
-
 // Drives Chip Select Low to issue a command
 void FLASH_CS_Low(void)
 {
@@ -341,6 +274,18 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 
 //! Erase Operations
 
+// Erase the entire data buffer
+void FLASH_EraseBuffer(void) {
+  uint8_t columnAddressByteArray[2] = {0, 0};
+
+  FLASH_WriteEnable();
+  FLASH_AwaitNotBusy();
+  FLASH_CS_Low();
+  FLASH_Transmit(&WRITE_BUFFER_WITH_RESET, 1);
+  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_CS_High();
+}
+
 // Erase the block which the page at the given address is located within
 void FLASH_EraseBlock(uint32_t pageAddress)
 {
@@ -369,14 +314,14 @@ void FLASH_ResetDevice(void)
 
 // Resets entire memory array of flash to 0xFF, for testing only
 void FLASH_EraseDevice(void)
-{ 
-  // Erase buffer
-  uint8_t emptyBuffer[2024] = {0xFF};
-  FLASH_WriteBuffer(emptyBuffer, 2024, 0);
+{
   // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
-  for (int i = 0; i < 0x3FFFF; i+=64)
+  for (int i = 0; i < 0x3FFFF; i += 64)
   {
     FLASH_EraseBlock(i);
     HAL_Delay(10); // Maxmimum possible erase time
   }
+
+  // Erase buffer
+  FLASH_EraseBuffer();
 }
