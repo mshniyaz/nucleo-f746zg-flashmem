@@ -102,6 +102,23 @@ void FLASH_ListenCommands(void)
     free(cmd);
 }
 
+// Parse parameters given to commands as integers
+uint32_t parseParamAsInt(char *param) {
+    char *endptr;
+    unsigned long result = strtoul(param, &endptr, 10); // Convert str to unsigned integer (base 10)
+
+    printf("%u\r\n", result);
+    printf("%u\r\n", (uint32_t)result);
+
+    // Check for invalid input or out-of-range values
+    if (*endptr != '\0' || result > UINT32_MAX) {
+        printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", param);
+        return UINT32_MAX;
+    }
+
+    return (uint32_t)result; // Safe cast to uint32_t
+}
+
 // Parses a list of tokens as a command given to the flash memory drive
 void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
 {
@@ -115,23 +132,42 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     }
     else if (strcmp(cmd, "reset-device") == 0)
     {
+
         FLASH_ResetDeviceCmd();
     }
     else if (strcmp(cmd, "register-test") == 0) // Test reads and writes
     {
+
         FLASH_TestRegisters();
     }
     else if (strcmp(cmd, "read-write-test") == 0) // Test reads and writes
     {
+
         FLASH_TestReadWrite(testData);
     }
     else if (strcmp(cmd, "erase-test") == 0)
     {
+
         FLASH_TestErase(testData);
     }
     else if (strcmp(cmd, "cycle-test") == 0)
     {
-        FLASH_TestCycle(testData);
+        if (tokenCount == 1)
+        {
+            FLASH_TestCycle(testData, 1);
+        }
+        else if (tokenCount >= 2)
+        {
+            char* cycleCountParam = tokens[1];
+            uint32_t testNumber = parseParamAsInt(cycleCountParam);
+            if (testNumber >= 256) {
+                testNumber = 255;
+            }
+            if (testNumber != UINT32_MAX)
+            {
+                FLASH_TestCycle(testData, testNumber);
+            }
+        }
     }
     else
     {
@@ -405,7 +441,8 @@ int FLASH_TestErase(uint8_t testData[4])
 }
 
 // TODO: Perform sequence to test cycles, accept a parameter input!
-void FLASH_TestCycle(uint8_t testData[4])
+void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount)
 {
+    printf("Test for %u cycles\r\n", cycleCount);
     return;
 }
