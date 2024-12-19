@@ -143,11 +143,10 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     // Parse and run each command
     if (strcmp(cmd, "help") == 0) // TODO: Display documentation
     {
-        printf("HELP NOT IMPLEMENTED YET SRY\r\n");
+        FLASH_GetCommandHelp();
     }
     else if (strcmp(cmd, "reset-device") == 0)
     {
-
         FLASH_ResetDeviceCmd();
     }
     else if (strcmp(cmd, "register-test") == 0) // Test reads and writes
@@ -179,6 +178,31 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     }
 }
 
+// Print out man.txt to help users
+void FLASH_GetCommandHelp(void)
+{
+    printf("\r\nCOMMANDS\r\n");
+    printf("FORMAT:\t<command> [<args>...]\r\n\n");
+
+    printf("help\r\n");
+    printf("Displays available commands and descriptions.\r\n\n");
+
+    printf("reset-device\r\n");
+    printf("Resets the entire flash memory device.\r\n\n");
+
+    printf("register-test\r\n");
+    printf("Verifies the functionality of memory registers.\r\n\n");
+
+    printf("read-write-test\r\n");
+    printf("Performs read and write tests on the flash memory.\r\n\n");
+
+    printf("erase-test\r\n");
+    printf("Tests the erasure of data in flash memory.\r\n\n");
+
+    printf("cycle-test [cycleCount] [pageCount]\r\n");
+    printf("Performs read-write cycles. Defaults: 1 cycle, 262144 pages.\r\n\n");
+}
+
 // Handle command to reset entire device
 void FLASH_ResetDeviceCmd(void)
 {
@@ -191,7 +215,7 @@ void FLASH_ResetDeviceCmd(void)
     return;
 }
 
-// Perform sequence to test registers, returning success (1) or failure (0)
+// Perform sequence to test registers
 int FLASH_TestRegisters(void)
 {
     uint8_t reg1 = FLASH_ReadRegister(1);
@@ -243,7 +267,7 @@ int FLASH_TestRegisters(void)
     return 1;
 }
 
-// Perform sequence to test reads and writes, returning a success (1) or failure (0)
+// Perform sequence to test reads and writes
 int FLASH_TestReadWrite(uint8_t testData[4])
 {
     uint8_t readResponse[4];
@@ -354,7 +378,7 @@ int FLASH_TestReadWrite(uint8_t testData[4])
     return 1;
 }
 
-// Perform sequence to test erases, return success (1) or failure (0)
+// Perform sequence to test erases
 int FLASH_TestErase(uint8_t testData[4])
 {
     uint8_t readResponse[4];
@@ -449,11 +473,11 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
 {
     printf("\r\nTest write and erase for %u cycle(s)\r\n", cycleCount);
     uint8_t writtenData[1088] = {0}; // Array of all 0 to overwrite 0xFF
-    
+
     // Set some constants
     uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
     uint8_t writesPerPage = ceil(2176 / sizeOfData);
-    uint16_t eraseCount = ceil(pageCount/64);
+    uint16_t eraseCount = ceil(pageCount / 64);
 
     // Log the parameters of the cycle test
     printf("Data of size %u bytes requires %u write(s) per page. Test will write from page 0 to page %u\r\n", sizeOfData, writesPerPage, pageCount - 1);
@@ -463,7 +487,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
     // Iterate cycleCount number of times
     for (int c = 0; c < cycleCount; c++)
     {
-        printf("\r\nCYCLE %u\r\n", c+1);
+        printf("\r\nCYCLE %u\r\n", c + 1);
 
         // Write into pages required
         printf("Starting write process\r\n");
@@ -475,9 +499,9 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
                 FLASH_WriteBuffer(writtenData, sizeOfData, w * sizeOfData);
             }
             FLASH_WriteExecute(p);
-            if ((p+1) % 10000 == 0)
+            if ((p + 1) % 10000 == 0)
             {
-                printf("[NOTICE] Written till %u-th page\r\n", p+1);
+                printf("[NOTICE] Written till %u-th page\r\n", p + 1);
             }
             HAL_Delay(1);
         }
@@ -486,10 +510,12 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
 
         // Erase pages required
         printf("Starting erase process\r\n");
-        for (int e=0; e< eraseCount; e++) {
+        for (int e = 0; e < eraseCount; e++)
+        {
             FLASH_EraseBlock(e);
-            if ( (e+1)%100 == 0) {
-                printf("[NOTICE] Erased till %u-th block\r\n", e+1);
+            if ((e + 1) % 100 == 0)
+            {
+                printf("[NOTICE] Erased till %u-th block\r\n", e + 1);
             }
         }
         printf("Erase complete\r\n");
