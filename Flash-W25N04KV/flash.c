@@ -7,93 +7,50 @@
 
 #include "flash.h"
 
-// Instruction Set Constants
-const uint8_t RESET_DEVICE = 0xFF;
-const uint8_t GET_JEDEC = 0x9F;
-const uint8_t READ_REGISTER = 0x0F;
-const uint8_t WRITE_REGISTER = 0x01;
-const uint8_t READ_PAGE = 0x13;
-const uint8_t READ_BUFFER = 0x03;
-const uint8_t WRITE_ENABLE = 0x06;
-const uint8_t WRITE_BUFFER = 0x84; //! Unused bits in data buffer not erased
-const uint8_t WRITE_EXECUTE = 0x10;
-const uint8_t ERASE_BLOCK = 0xD8;
-
-// Addresses of 3 status registers
-const uint8_t REGISTER_ONE = 0xA0;
-const uint8_t REGISTER_TWO = 0xB0;
-const uint8_t REGISTER_THREE = 0xC0;
-const uint8_t *REGISTERS[] = {
-    &REGISTER_ONE,
-    &REGISTER_TWO,
-    &REGISTER_THREE
-};
-
-// Timeout to use for all SPI communications (in ms)
-const uint32_t SPI_TIMEOUT = 100;
-
 //! General Operations
-
-// Prints a string of arbitrary size via UART
-void UART_Printf(const char *format, ...)
-{
-  va_list args;
-  int UARTBufLen;
-  char *UARTBuf;
-
-  // Start variadic argument processing
-  va_start(args, format);
-  UARTBufLen = vsnprintf(NULL, 0, format, args) + 1; // Calc required buffer length (+1 for null terminator)
-  UARTBuf = (char *)malloc(UARTBufLen);
-  if (UARTBuf == NULL)
-  {
-    va_end(args);
-    return;
-  }
-
-  // Transmit the string using UART
-  vsnprintf(UARTBuf, UARTBufLen, format, args);
-  HAL_UART_Transmit(&huart3, (uint8_t *)UARTBuf, UARTBufLen - 1, SPI_TIMEOUT); // -1 to exclude the null terminator
-  free(UARTBuf);
-  // End variadic argument processing
-  va_end(args);
-}
 
 // Drives Chip Select Low to issue a command
 void FLASH_CS_Low(void)
 {
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+
+  // Verify if the pin state is actually low
+  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_RESET)
+  {
+    printf("Error: Failed to flash chip select low\r\n");
+  }
 }
 
 // Drives Chip Select High after issuing a command
 void FLASH_CS_High(void)
 {
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+
+  // Verify if the pin state is actually low
+  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_SET)
+  {
+    printf("Error: Failed to flash chip select high\r\n");
+  }
 }
 
 // Transmits 1 or more bytes of data from master to slave via SPI
-void FLASH_Transmit(uint8_t *data, uint16_t size, uint32_t timeout)
+void FLASH_Transmit(uint8_t *data, uint16_t size)
 {
-  if (HAL_SPI_Transmit(&hspi1, data, size, timeout) != HAL_OK)
+  if (HAL_SPI_Transmit(&hspi1, data, size, COM_TIMEOUT) != HAL_OK)
   {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+    printf("SPI transmit failed\r\n");
+    FLASH_CS_High();
     return;
   }
 }
 
-// Generates a cycle of 8 dummy clocks by transmitting 0x00
-void FLASH_DummyClock(void)
-{
-  uint8_t dummy_byte = 0x00;
-  FLASH_Transmit(&dummy_byte, 1, SPI_TIMEOUT);
-}
-
 // Receive output from the slave (flash memory) via SPI
-void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
+void FLASH_Receive(uint8_t *buf, uint16_t size)
 {
   uint8_t response[size];
-  if (HAL_SPI_Receive(&hspi1, response, size, timeout) != HAL_OK)
+  if (HAL_SPI_Receive(&hspi1, response, size, COM_TIMEOUT) != HAL_OK)
   {
+    printf("SPI receive failed \r\n");
     FLASH_CS_High();
     return;
   }
@@ -102,15 +59,25 @@ void FLASH_Receive(uint8_t *buf, uint16_t size, uint32_t timeout)
   memcpy(buf, response, size);
 }
 
+// Generates a cycle of 8 dummy clocks by transmitting 0x00
+void FLASH_DummyClock(void)
+{
+  uint8_t dummy_byte = 0x00;
+  FLASH_Transmit(&dummy_byte, 1);
+}
+
 // Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
-void uitn32GetLastThreeBits(uint32_t n, uint8_t* threeLSB) {
-    for (int i = 0; i <= 2; i++) {
-        threeLSB[2 - i] = *(((uint8_t*)&n) + i); // Note uint32_t is little endian
-    }
+void uitn32GetLastThreeBits(uint32_t n, uint8_t *threeLSB)
+{
+  for (int i = 0; i <= 2; i++)
+  {
+    threeLSB[2 - i] = *(((uint8_t *)&n) + i); // Note uint32_t is little endian
+  }
 }
 
 // Convert uint16_t to a big endian byte array
-void uint16ToByteArray(uint16_t n, uint8_t* byteArray) {
+void uint16ToByteArray(uint16_t n, uint8_t *byteArray)
+{
   byteArray[0] = (n >> 8) & 0xFF;
   byteArray[1] = n & 0xFF;
 }
@@ -124,16 +91,16 @@ uint8_t FLASH_ReadRegister(int registerNo)
 
   // Carry out the read instruction
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_REGISTER, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_REGISTER, 1);
   if (registerNo >= 1 && registerNo <= 3)
   {
-    FLASH_Transmit(REGISTERS[registerNo-1], 1, SPI_TIMEOUT);
+    FLASH_Transmit(REGISTERS[registerNo - 1], 1);
   }
   else
   {
-    FLASH_Transmit(REGISTERS[2], 1, SPI_TIMEOUT); // Get status register by deafult
+    FLASH_Transmit(REGISTERS[2], 1); // Get status register by deafult
   }
-  FLASH_Receive(registerResponse, 1, SPI_TIMEOUT);
+  FLASH_Receive(registerResponse, 1);
   FLASH_CS_High();
   return registerResponse[0];
 }
@@ -159,18 +126,19 @@ void FLASH_AwaitNotBusy(void)
 {
   while (FLASH_IsBusy())
   {
-    HAL_Delay(1); // Short delays of 1ms
+    HAL_Delay(10); // Short delays of 10ms
   }
 }
 
 // Disable write protection for all blocks and registers
-void FLASH_DisableWriteProtect(void) {
+void FLASH_DisableWriteProtect(void)
+{
   uint8_t newRegValue = 0x00; // Set all bits to zero
 
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_REGISTER, 1, SPI_TIMEOUT);
-  FLASH_Transmit(REGISTERS[0], 1, SPI_TIMEOUT);
-  FLASH_Transmit(&newRegValue, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_REGISTER, 1);
+  FLASH_Transmit(REGISTERS[0], 1);
+  FLASH_Transmit(&newRegValue, 1);
   FLASH_CS_High();
 }
 
@@ -183,18 +151,19 @@ void FLASH_ReadJEDECID(void)
 
   // Send JEDEC ID opcode
   FLASH_CS_Low();
-  FLASH_Transmit(&GET_JEDEC, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&GET_JEDEC, 1);
   FLASH_DummyClock();
 
   // Receive 3 bytes (JEDEC ID)
-  FLASH_Receive(jedecResponse, 3, SPI_TIMEOUT);
+  FLASH_Receive(jedecResponse, 3);
   FLASH_CS_High();
 
   // Print JEDEC ID to UART
-  UART_Printf("\r\n------------------------------\r\n");
-  UART_Printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
+  printf("\r\n------------------------\r\n");
+  printf("W25N04KV QspiNAND Memory\r\n");
+  printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
               jedecResponse[0], jedecResponse[1], jedecResponse[2]);
-  UART_Printf("\r\n------------------------------\r\n");
+  printf("\r\n------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer
@@ -205,40 +174,27 @@ void FLASH_ReadPage(uint32_t pageAddress)
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_PAGE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_PAGE, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(1);
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
-void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
+void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-  uint8_t readResponse[size];
   uint8_t columnAddressByteArray[2];
   uint16ToByteArray(columnAddress, columnAddressByteArray);
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&READ_BUFFER, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&READ_BUFFER, 1);
   // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT);
+  FLASH_Transmit(columnAddressByteArray, 2);
   FLASH_DummyClock();
-  FLASH_Receive(readResponse, size, SPI_TIMEOUT);
+  FLASH_Receive(readResponse, size);
   FLASH_CS_High();
-
-  UART_Printf("\r\n");
-  for (uint16_t i = 0; i < size; i++)
-  {
-    if (i == 0)
-    {
-      UART_Printf("Buffer Memory: %02x ", readResponse[i]);
-    }
-    else
-    {
-      UART_Printf("%02x ", readResponse[i]);
-    }
-  }
 }
 
 //! Write Operations
@@ -247,7 +203,7 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size)
 void FLASH_WriteEnable(void)
 {
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_ENABLE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_ENABLE, 1);
   FLASH_CS_High();
 }
 
@@ -261,9 +217,9 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_BUFFER, 1, SPI_TIMEOUT);
-  FLASH_Transmit(columnAddressByteArray, 2, SPI_TIMEOUT); // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(data, size, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_BUFFER, 1);
+  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(data, size);
   FLASH_CS_High();
 }
 
@@ -275,43 +231,71 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&WRITE_EXECUTE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&WRITE_EXECUTE, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(1);
 }
 
 //! Erase Operations
 
-// Erase the block which the page at the given address is located within
-void FLASH_EraseBlock(uint32_t pageAddress) {
+// Erase the entire data buffer
+void FLASH_EraseBuffer(void) {
+  uint8_t columnAddressByteArray[2] = {0, 0};
+
+  FLASH_WriteEnable();
+  FLASH_AwaitNotBusy();
+  FLASH_CS_Low();
+  FLASH_Transmit(&WRITE_BUFFER_WITH_RESET, 1);
+  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_CS_High();
+}
+
+// Erase the block at the given block address (between 0 and 4095)
+void FLASH_EraseBlock(uint16_t blockAddress)
+{ 
+  // Verify input
+  if (blockAddress >= 4096) {
+    printf("Attempted to erase invalid block %d", blockAddress);
+    return;
+  }
+
+  // FInd page address
+  uint32_t pageAddress = blockAddress * 64; // Address of first page in block
   uint8_t truncatedPageAddress[3];
   uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
 
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&ERASE_BLOCK, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&ERASE_BLOCK, 1);
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3, SPI_TIMEOUT);
+  FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(10); // Maxmimum possible erase time
 }
 
 // Resets device software and disables write protection
-void FLASH_ResetDevice(void)
+void FLASH_ResetDeviceSoftware(void)
 {
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
-  FLASH_Transmit(&RESET_DEVICE, 1, SPI_TIMEOUT);
+  FLASH_Transmit(&RESET_DEVICE, 1);
   FLASH_CS_High();
-
   FLASH_DisableWriteProtect();
 }
 
-// Resets entire memory array of flash to 0xFF, for testing only
-void FLASH_EraseDevice(void) {
-  // There are 262144 (2^18 or 0x3FFFF+0x1) pages in eraseable blocks of 64
-  for (int i=0; i<0x3FFFF; i+=64) {
+// Resets entire memory array of flash to 0xFF, and also reset software
+void FLASH_EraseDevice(void)
+{
+  // There are 40
+  for (int i = 0; i < 4096; i ++)
+  {
     FLASH_EraseBlock(i);
   }
+
+  // Erase buffer and reset software
+  FLASH_EraseBuffer();
+  FLASH_ResetDeviceSoftware();
 }
