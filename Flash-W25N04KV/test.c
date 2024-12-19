@@ -155,7 +155,9 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     }
     else if (strcmp(cmd, "read-write-test") == 0) // Test reads and writes
     {
-        FLASH_TestReadWrite(testData);
+        uint32_t testPageAddress = (tokenCount >= 2 && validInt(tokens[1])) ? parseParamAsInt(tokens[1]) : 1;
+        testPageAddress = clamp(testPageAddress, 262143);
+        FLASH_TestReadWrite(testData, testPageAddress);
     }
     else if (strcmp(cmd, "erase-test") == 0)
     {
@@ -182,30 +184,33 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
 // Print out man.txt to help users
 void FLASH_GetCommandHelp(void)
 {
-printf("\r\nCOMMANDS\r\n");
-printf("FORMAT:\t<command> [<args>...]\r\n\n");
+    printf("\r\nCOMMANDS\r\n");
+    printf("FORMAT:\t<command> [<args>...]\r\n\n");
 
-printf("help\r\n");
-printf("Displays available commands and descriptions.\r\n\n");
+    printf("help\r\n");
+    printf("Displays available commands and descriptions.\r\n\n");
 
-printf("reset-device\r\n");
-printf("Resets the entire flash memory device.\r\n\n");
+    printf("reset-device\r\n");
+    printf("Resets the entire flash memory device.\r\n\n");
 
-printf("register-test\r\n");
-printf("Verifies the values of the memory status registers.\r\n\n");
+    printf("register-test\r\n");
+    printf("Verifies the values of the memory status registers.\r\n\n");
 
-printf("read-write-test\r\n");
-printf("Performs read and write tests on the flash memory.\r\n\n");
+    printf("read-write-test [testPageAddress]\r\n");
+    printf("Defaults: Page Address 0.\r\n");
+    printf("Performs read and write tests on the flash memory. Ensures buffer\r\n");
+    printf("reads and writes are working, and that data can be written to and\r\n");
+    printf("read from a page without modifying other pages\r\n\n");
 
-printf("erase-test [testBlockAddress]\r\n");
-printf("Defaults: Block address 0.\r\n");
-printf("Tests the erasure of data in flash memory.\r\n");
-printf("Block at testBlockAddress its subsequent block are filled with data,\r\n");
-printf("but only the test block is erased. The data of both blocks is then checked.\r\n\n");
+    printf("erase-test [testBlockAddress]\r\n");
+    printf("Defaults: Block address 0.\r\n");
+    printf("Tests the erasure of data in flash memory. Block at testBlockAddress\r\n");
+    printf("and its subsequent block are filled with data, but only the test block\r\n");
+    printf("is erased. The data of both blocks is then checked.\r\n\n");
 
-printf("cycle-test [cycleCount] [pageCount]\r\n");
-printf("Defaults: 1 cycle, 262144 pages.\r\n");
-printf("Performs repeated write-erase cycles for the first 'pageCount' pages.\r\n\n");
+    printf("cycle-test [cycleCount] [pageCount]\r\n");
+    printf("Defaults: 1 cycle, 262144 pages.\r\n");
+    printf("Performs repeated write-erase cycles for the first 'pageCount' pages.\r\n\n");
 }
 
 // Handle command to reset entire device
@@ -273,7 +278,7 @@ int FLASH_TestRegisters(void)
 }
 
 // Perform sequence to test reads and writes
-int FLASH_TestReadWrite(uint8_t testData[4])
+int FLASH_TestReadWrite(uint8_t testData[4], uint32_t testPageAddress)
 {
     uint8_t readResponse[4];
     uint8_t emptyResponse[4] = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -328,8 +333,8 @@ int FLASH_TestReadWrite(uint8_t testData[4])
     }
 
     // Execute the write
-    printf("Executing write to page 5 (arbitrarily chosen), flushing buffer\r\n");
-    FLASH_WriteExecute(5);                //! Write to page 5
+    printf("Executing write to page %u, flushing buffer\r\n", testPageAddress);
+    FLASH_WriteExecute(testPageAddress);  //! Write to the provided page address
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
@@ -360,8 +365,8 @@ int FLASH_TestReadWrite(uint8_t testData[4])
     }
 
     // Test reading of the page
-    printf("Reading page 5 into data buffer\r\n");
-    FLASH_ReadPage(5);                    //! Read page 5
+    printf("Reading page %u into data buffer\r\n", testPageAddress);
+    FLASH_ReadPage(testPageAddress);      //! Read the page at the provided address
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X \r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
@@ -378,8 +383,8 @@ int FLASH_TestReadWrite(uint8_t testData[4])
     // Reset pages for next test
     printf("All tests passed\r\n");
     FLASH_EraseBuffer();
-    FLASH_WriteExecute(5);
-    printf("Wiped out page 5 for next test\r\n\n");
+    FLASH_WriteExecute(testPageAddress);
+    printf("Wiped out page %u for next test\r\n\n", testPageAddress);
     return 1;
 }
 
@@ -406,7 +411,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
 
     // Verify that page at test address has been filled
     printf("Loading first page of block %u into buffer\r\n", testBlockAddress);
-    FLASH_ReadPage(testBlockAddress*64);
+    FLASH_ReadPage(testBlockAddress * 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
@@ -421,18 +426,18 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
     }
 
     // Verify that page 64 has been filled
-    printf("Loading first page of block %u into buffer\r\n", testBlockAddress+1);
-    FLASH_ReadPage(testBlockAddress*64+64);
+    printf("Loading first page of block %u into buffer\r\n", testBlockAddress + 1);
+    FLASH_ReadPage(testBlockAddress * 64 + 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Data was correctly written to block %u\r\n\n", testBlockAddress+1);
+        printf("[PASSED] Data was correctly written to block %u\r\n\n", testBlockAddress + 1);
     }
     else
     {
-        printf("[ERROR] Failed to write data to block %u\r\n\n", testBlockAddress+1);
+        printf("[ERROR] Failed to write data to block %u\r\n\n", testBlockAddress + 1);
         return 0;
     }
 
@@ -454,18 +459,18 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
     }
 
     // Verify that block 1 has not been erased
-    printf("Loaded non-erased block %u's first page into data buffer\r\n", testBlockAddress+1);
-    FLASH_ReadPage(testBlockAddress*64+64);
+    printf("Loaded non-erased block %u's first page into data buffer\r\n", testBlockAddress + 1);
+    FLASH_ReadPage(testBlockAddress * 64 + 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Block %u was not erroneously erased\r\n\n", testBlockAddress+1);
+        printf("[PASSED] Block %u was not erroneously erased\r\n\n", testBlockAddress + 1);
     }
     else
     {
-        printf("[ERROR] Block %u was erroneously erased\r\n\n", testBlockAddress+1);
+        printf("[ERROR] Block %u was erroneously erased\r\n\n", testBlockAddress + 1);
         return 0;
     }
 
