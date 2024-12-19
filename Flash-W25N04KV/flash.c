@@ -271,6 +271,7 @@ void FLASH_EraseBlock(uint32_t blockAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(10); // Maxmimum possible erase time
 }
 
 // Resets device software and disables write protection
@@ -290,7 +291,6 @@ void FLASH_EraseDevice(void)
   for (int i = 0; i < 4096; i ++)
   {
     FLASH_EraseBlock(i);
-    HAL_Delay(10); // Maxmimum possible erase time
   }
 
   // Erase buffer and reset software

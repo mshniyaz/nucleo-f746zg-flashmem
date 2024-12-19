@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 
 #ifndef FLASH_CONSTANTS_H
 #define FLASH_CONSTANTS_H

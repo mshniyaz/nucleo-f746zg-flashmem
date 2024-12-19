@@ -7,6 +7,38 @@
 
 #include "flash.h"
 
+//! Utility functions
+
+// Parse parameters given to commands as integers
+uint32_t parseParamAsInt(char *param)
+{
+    char *endptr;
+    unsigned long result = strtoul(param, &endptr, 10); // Convert str to unsigned integer (base 10)
+
+    // Check for invalid input or out-of-range values
+    if (*endptr != '\0' || result > UINT32_MAX)
+    {
+        printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", param);
+        return UINT32_MAX;
+    }
+
+    return (uint32_t)result; // Safe cast to uint32_t
+}
+
+// Checks if a token is a valid integer
+bool validInt(char *param)
+{
+    return parseParamAsInt(param) != UINT32_MAX; // Safe cast to uint32_t
+}
+
+// Helper function to clamp values
+uint32_t clamp(uint32_t value, uint32_t max)
+{
+    return (value >= max) ? max : value;
+}
+
+//! Command functions
+
 // Listens for user input and submits when enter is pressed, storing results in buffers
 void UART_ListenInput(char *inputBuffer, int *inputLen)
 {
@@ -102,23 +134,6 @@ void FLASH_ListenCommands(void)
     free(cmd);
 }
 
-// Parse parameters given to commands as integers
-uint32_t parseParamAsInt(char *param) {
-    char *endptr;
-    unsigned long result = strtoul(param, &endptr, 10); // Convert str to unsigned integer (base 10)
-
-    printf("%u\r\n", result);
-    printf("%u\r\n", (uint32_t)result);
-
-    // Check for invalid input or out-of-range values
-    if (*endptr != '\0' || result > UINT32_MAX) {
-        printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", param);
-        return UINT32_MAX;
-    }
-
-    return (uint32_t)result; // Safe cast to uint32_t
-}
-
 // Parses a list of tokens as a command given to the flash memory drive
 void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
 {
@@ -152,22 +167,11 @@ void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
     }
     else if (strcmp(cmd, "cycle-test") == 0)
     {
-        if (tokenCount == 1)
-        {
-            FLASH_TestCycle(testData, 1);
-        }
-        else if (tokenCount >= 2)
-        {
-            char* cycleCountParam = tokens[1];
-            uint32_t testNumber = parseParamAsInt(cycleCountParam);
-            if (testNumber >= 256) {
-                testNumber = 255;
-            }
-            if (testNumber != UINT32_MAX)
-            {
-                FLASH_TestCycle(testData, testNumber);
-            }
-        }
+        uint32_t cycleCount = (tokenCount >= 2 && validInt(tokens[1])) ? parseParamAsInt(tokens[1]) : 1;
+        uint32_t pageCount = (tokenCount >= 3 && validInt(tokens[2])) ? parseParamAsInt(tokens[2]) : 262144;
+
+        // Run the command
+        FLASH_TestCycle(testData, cycleCount, pageCount);
     }
     else
     {
@@ -440,9 +444,56 @@ int FLASH_TestErase(uint8_t testData[4])
     return 1;
 }
 
-// TODO: Perform sequence to test cycles, accept a parameter input!
-void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount)
+// Perform sequence to perform "cycleCount" number of read-write cycles, testing the first "pageCount" pages
+void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount)
 {
-    printf("Test for %u cycles\r\n", cycleCount);
-    return;
+    printf("\r\nTest write and erase for %u cycle(s)\r\n", cycleCount);
+    uint8_t writtenData[1088] = {0}; // Array of all 0 to overwrite 0xFF
+    
+    // Set some constants
+    uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
+    uint8_t writesPerPage = ceil(2176 / sizeOfData);
+    uint16_t eraseCount = ceil(pageCount/64);
+
+    // Log the parameters of the cycle test
+    printf("Data of size %u bytes requires %u write(s) per page. Test will write from page 0 to page %u\r\n", sizeOfData, writesPerPage, pageCount - 1);
+    printf("Page currently being written to will be logged every 10,000 pages\r\n");
+    printf("Block currently erased is logged every 100 blocks\r\n");
+
+    // Iterate cycleCount number of times
+    for (int c = 0; c < cycleCount; c++)
+    {
+        printf("\r\nCYCLE %u\r\n", c+1);
+
+        // Write into pages required
+        printf("Starting write process\r\n");
+        for (int p = 0; p < pageCount; p++)
+        {
+            // Write data to page in portions
+            for (int w = 0; w < writesPerPage; w++)
+            {
+                FLASH_WriteBuffer(writtenData, sizeOfData, w * sizeOfData);
+            }
+            FLASH_WriteExecute(p);
+            if ((p+1) % 10000 == 0)
+            {
+                printf("[NOTICE] Written till %u-th page\r\n", p+1);
+            }
+            HAL_Delay(1);
+        }
+        printf("Write complete\r\n\n");
+        HAL_Delay(100);
+
+        // Erase pages required
+        printf("Starting erase process\r\n");
+        for (int e=0; e< eraseCount; e++) {
+            FLASH_EraseBlock(e);
+            if ( (e+1)%100 == 0) {
+                printf("[NOTICE] Erased till %u-th block\r\n", e+1);
+            }
+        }
+        printf("Erase complete\r\n");
+    }
+
+    printf("\r\nCompleted write-erase cycle, run \"read-write-test\" to check flash integrity\r\n\n");
 }
