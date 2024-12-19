@@ -483,11 +483,11 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
 void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount)
 {
     printf("\r\nTest write and erase for %u cycle(s)\r\n", cycleCount);
-    uint8_t writtenData[1088] = {0}; // Array of all 0 to overwrite 0xFF
+    uint8_t writtenData[1024] = {0}; // Array of all 0 to overwrite 0xFF
 
     // Set some constants
     uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
-    uint8_t writesPerPage = ceil(2176 / sizeOfData);
+    uint8_t writesPerPage = ceil(2048 / sizeOfData);
     uint16_t eraseCount = ceil(pageCount / 64);
 
     // Log the parameters of the cycle test

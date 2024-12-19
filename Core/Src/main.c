@@ -115,24 +115,6 @@ int main(void)
   HAL_Delay(3000);
   FLASH_ReadJEDECID();
   FLASH_ResetDeviceSoftware();
-
-  //! Testing code
-  // FLASH_EraseDevice();
-  // // TODO: Testing writes
-  // // Define some constants
-  // uint8_t readResponse[4];
-  // uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68};
-  // FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
-  // FLASH_WriteBuffer(testData, 4, 0);    //! Write to buf
-  // FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
-  // FLASH_ReadBuffer(2, 4, readResponse); //! Expect bitshifted
-  // FLASH_WriteExecute(5);                //! Write to page 5
-  // FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
-  // FLASH_ReadPage(5);                    //! Read page 5
-  // FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
-  // FLASH_ReadPage(0); //! Read page 0
-  // FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
-
   /* USER CODE END 2 */
 
   /* Init scheduler */

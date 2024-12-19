@@ -51,9 +51,6 @@ static const uint32_t COM_TIMEOUT = 100;
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart3;
 
-// General functions
-void UART_ListenInput(char *resultBuffer, int *resultLen);
-
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
 
