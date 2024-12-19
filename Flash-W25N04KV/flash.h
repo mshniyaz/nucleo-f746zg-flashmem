@@ -54,15 +54,13 @@ extern UART_HandleTypeDef huart3;
 // General functions
 void UART_ListenInput(char *resultBuffer, int *resultLen);
 
-// Status Register management functions
+// Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
-bool FLASH_IsBusy(void);
-bool FLASH_IsWEL(void);
 
 // Read functions
 void FLASH_ReadJEDECID(void);
-void FLASH_ReadPage(uint32_t pageAddress);
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_ReadPage(uint32_t pageAddress);
 
 // Write Functions
 void FLASH_WriteEnable(void);
@@ -71,7 +69,7 @@ void FLASH_WriteExecute(uint32_t pageAddress);
 
 // Erase Functions
 void FLASH_EraseBuffer(void);
-void FLASH_EraseBlock(uint32_t pageAddress);
+void FLASH_EraseBlock(uint16_t blockAddress);
 void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 

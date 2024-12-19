@@ -178,6 +178,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(1);
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
@@ -234,6 +235,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
+  HAL_Delay(1);
 }
 
 //! Erase Operations
@@ -251,7 +253,7 @@ void FLASH_EraseBuffer(void) {
 }
 
 // Erase the block at the given block address (between 0 and 4095)
-void FLASH_EraseBlock(uint32_t blockAddress)
+void FLASH_EraseBlock(uint16_t blockAddress)
 { 
   // Verify input
   if (blockAddress >= 4096) {
