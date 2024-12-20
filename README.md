@@ -1,6 +1,8 @@
 # W25N04KV Operation Set Implementation for STM32
 
-Implementation of the instruction set for the Winbond W25N04KV 3V 4G-bit NAND flash memory with SPI. Designed for use with the Nucleo F746ZG. (Using this library with other boards will require additional configuration of the `.ioc` file.)
+Implementation of the instruction set for the Winbond W25N04KV 3V 4G-bit NAND flash memory with SPI. Designed for use with the Nucleo F746ZG (Using this library with other boards will require additional configuration of the `.ioc` file.).
+
+Meant for use with the STM32CubeIDE 1.17.0, installed from [this link](https://www.st.com/en/development-tools/stm32cubeide.html), since this program can only be compiled with this IDE.
 
 ## Useful Links
 
@@ -31,20 +33,20 @@ Six pins on the W25N04KV (refer to the datasheet for pin locations) must be conn
 2. **Master Out Slave In (MOSI)**: Connected to PA7, set to `SPI1_MOSI`.
 3. **Master In Slave Out (MISO)**: Connected to PA6, set to `SPI1_MISO`.
 4. **Clock (CLK)**: Connected to PA5, set to `SPI1_SCK`.
-5. **Power (VCC)**: Connected to `3V3`.
+5. **Power (VCC)**: Connected to `3V3` (Minimum currents of 25mA active, 10μA standby, 1μA DPD).
 6. **Ground (GND)**: Connected to `GND`.
 
 ## Accessing the CLI for the Flash
 
 After configuring the `.ioc` file, save it to update the generated code in the `main.c` file.
 
-To access the CLI provided, use a serial communication program like Minicom or Picocom (for Linux) or PuTTY and Tera Term (for Windows). The CLI has been tested with Minicom on Ubuntu 22.04.5 LTS.
+To access the Command Line Interface (CLI) provided, use a serial communication program like Minicom or Picocom (for Linux) or PuTTY and Tera Term (for Windows). The CLI has been tested with Minicom on Ubuntu 22.04.5 LTS.
 
 ### Using Minicom
 
 1. Connect the MCU to the computer via USB.
 2. A new directory of the format `/dev/tty*` will appear (e.g., `/dev/ttyACM0`).
-3. If you do not have minicom, install it with `sudo apt-get install minicom`
+3. If you do not have minicom, install it with `sudo apt-get install minicom`.
 4. Run `sudo minicom -s`.
 5. Select **Serial Port Setup** > Change **Option A** to the correct device path > Save as default > Exit minicom.  
 6. Run `minicom` to access the CLI.
@@ -65,3 +67,4 @@ The circular buffer has not yet been implemented. Notable potential issues inclu
 
 1. When writing to the data buffer, data exceeding the buffer size is ignored. Dummy bytes must be left at the end of pages to prevent packet splitting between pages.
 2. Since ECC is disabled, the data buffer may have additional bytes (up to 2176 from 2048). If additional bytes are available, `FLASH_TestCycle` (in `test.c`) must be updated appropriately.
+3. Page Read/Write and Buffer Read/Write have HAL_Delays of 1ms after execution of the command.

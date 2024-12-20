@@ -49,7 +49,7 @@ void UART_ListenInput(char *inputBuffer, int *inputLen)
     while (true)
     {
         // Receive one byte
-        if (HAL_UART_Receive(&huart3, &receivedByte, 1, HAL_MAX_DELAY) == HAL_OK)
+        if (HAL_UART_Receive(&huart3, &receivedByte, 1, COM_TIMEOUT) == HAL_OK)
         {
             if (receivedByte == 0x0D) // Enter
             {
