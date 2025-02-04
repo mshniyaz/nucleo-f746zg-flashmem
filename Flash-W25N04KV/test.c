@@ -79,86 +79,77 @@ bool isAllSpaces(char *str)
     return true;
 }
 
+//! Buffers for input processing
+volatile uint8_t receivedByte;
+volatile uint8_t cmdIndex = 0;
+static volatile char cmdBuf[100]; // Maxmimum input length of 100
+volatile bool listeningCommands = false;
+
 //! Command functions
 
-// Listens for user input and submits when enter is pressed, storing results in buffers
-void UART_ListenInput(char *inputBuf, int *inputLen)
+// UART receive callback function for interrupt-driven polling
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    uint8_t receivedByte;
-    uint8_t index = 0;
-    char cmdBuf[MAX_INPUT_LEN];
-
-    while (true)
+    if (receivedByte == 0x0D) // Enter
     {
-        // Receive one byte
-        if (HAL_UART_Receive(&huart3, &receivedByte, 1, COM_TIMEOUT) == HAL_OK)
+        cmdBuf[cmdIndex] = '\0';
+        printf("\r\n");
+
+        // Parse and run the command
+        if (cmdBuf == NULL || cmdBuf[0] == '\0' || cmdIndex == 0 || isAllSpaces(cmdBuf))
         {
-            if (receivedByte == 0x0D) // Enter
+            // Do nothing
+        }
+        else
+        {
+            // Tokenize the string
+            char *tokens[10]; // Max of 10 tokens
+            int tokenCount = 0;
+            char *token = strtok(cmdBuf, " ");
+            while (token != NULL && tokenCount < 10)
             {
-                cmdBuf[index] = '\0';
-                printf("\r\n");
-                break;
+                tokens[tokenCount] = token;
+                tokenCount++;
+                token = strtok(NULL, " ");
             }
-            else if (receivedByte == 0x08) // Backspace
-            {
-                if (index > 0)
-                {
-                    index--;
-                    printf("\b \b"); // Erase the last character on the terminal
-                }
-            }
-            else
-            {
-                // Add character to buffer and print it
-                if (index < MAX_INPUT_LEN - 1)
-                {
-                    cmdBuf[index] = receivedByte;
-                    printf("%c", (char)receivedByte);
-                    index++;
-                }
-            }
+            FLASH_RunCommand(tokens, tokenCount);
+        }
+
+        // Reset input tracking to prep for next command input
+        cmdIndex = 0;
+        listeningCommands = false;
+    }
+    else if (receivedByte == 0x08) // Backspace
+    {
+        if (cmdIndex > 0)
+        {
+            cmdIndex--;
+            printf("\b \b"); // Erase the last character on the terminal
+        }
+    }
+    else
+    {
+        // Add character to buffer and print it
+        if (cmdIndex < 100 - 1)
+        {
+            cmdBuf[cmdIndex] = receivedByte;
+            printf("%c", (char)receivedByte);
+            cmdIndex++;
         }
     }
 
-    // Copy input to the result buffer safely
-    if (inputBuf != NULL)
-    {
-        strncpy(inputBuf, cmdBuf, MAX_INPUT_LEN);
-    }
-
-    // Return input length if resultLen is valid
-    if (inputLen != NULL)
-    {
-        *inputLen = index;
-    }
+    HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
 }
 
 // Listens for commands transmitted to the MCU via UART for testing the flash
 void FLASH_ListenCommands(void)
 {
-    printf("cmd: ");
-    char cmdBuf[MAX_INPUT_LEN];
-    int cmdLen;
-    UART_ListenInput(cmdBuf, &cmdLen);
-    // Ensure command is valid
-    if (cmdBuf == NULL || cmdBuf[0] == '\0' || cmdLen == 0 || isAllSpaces(cmdBuf))
+    if (!listeningCommands)
     {
-        return;
+        printf("cmd: ");
+        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
+        listeningCommands = true;
     }
-
-    // Parse into command and arguments
-    char *tokens[10]; // List to store tokens, max of 10
-    int tokenCount = 0;
-    char *token = strtok(cmdBuf, " ");
-    while (token != NULL && tokenCount < 10)
-    {
-        tokens[tokenCount] = token;
-        tokenCount++;
-        token = strtok(NULL, " ");
-    }
-
-    // Clean up and run
-    FLASH_RunCommand(tokens, tokenCount);
 }
 
 // Parses a list of tokens as a command given to the flash memory drive
@@ -180,7 +171,6 @@ void FLASH_RunCommand(char *tokens[10], uint8_t tokenCount)
         FLASH_TestRegisters();
         break;
     case READ_WRITE_TEST_CMD:
-        //! REWRITE THE BELOW COMMANDS AND THEN COMMIT, WORK ON UART INTERRUPT AND UPDATE NOTES
         uint32_t testPageAddress = 1;
         if (tokenCount >= 2)
         {
@@ -443,7 +433,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
         FLASH_WriteExecute(p);
         // printf("%u\r\n", p);
     }
-    HAL_Delay(100);
+    osDelay(100);
 
     // Verify that page at test address has been filled
     printf("Loading first page of block %u into buffer\r\n", testBlockAddress);
@@ -524,7 +514,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
     // Set some constants
     uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
     uint8_t writesPerPage = ceil(2048 / sizeOfData);
-    uint16_t eraseCount = ceil(pageCount / 64);
+    uint16_t eraseCount = ceil((double)pageCount / 64);
 
     // Log the parameters of the cycle test
     printf("Data of size %u bytes requires %u write(s) per page.\r\nTest will write from page 0 to page %u\r\n", sizeOfData, writesPerPage, pageCount - 1);
@@ -544,7 +534,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
             for (int w = 0; w < writesPerPage; w++)
             {
                 FLASH_WriteBuffer(writtenData, sizeOfData, w * sizeOfData);
-            }    
+            }
             FLASH_WriteExecute(p);
             if ((p + 1) % 10000 == 0)
             {
@@ -552,7 +542,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
             }
         }
         printf("Write complete\r\n\n");
-        HAL_Delay(100);
+        osDelay(100);
 
         // Erase pages required
         printf("Starting erase process\r\n");

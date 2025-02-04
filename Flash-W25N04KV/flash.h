@@ -9,6 +9,7 @@
 #define FLASH_H_
 
 #include "stm32f7xx_hal.h"
+#include "stm32f7xx_hal_uart.h"
 #include <stdio.h>
 // #include <stdarg.h>
 #include <stdint.h>
@@ -40,9 +41,6 @@ static const uint8_t *REGISTERS[] = {
     &REGISTER_ONE,
     &REGISTER_TWO,
     &REGISTER_THREE};
-
-// Maximum buffer length for inputs
-static const uint8_t MAX_INPUT_LEN = 64; // Must match cmd buffer size
 
 // Timeout to use for all communications (in ms)
 static const uint32_t COM_TIMEOUT = 100;

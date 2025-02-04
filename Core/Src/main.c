@@ -112,6 +112,7 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+  // Read JEDEC
   HAL_Delay(3000);
   FLASH_ReadJEDECID();
   FLASH_ResetDeviceSoftware();
@@ -433,6 +434,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 /**
  * @brief  Retargets the C library printf function to the USART.
  *   None
@@ -462,7 +464,7 @@ void listenCommands(void *argument)
   for (;;)
   {
     FLASH_ListenCommands();
-    osDelay(10);
+    osDelay(100);
   }
 
   // In case we accidentally exit from task loop

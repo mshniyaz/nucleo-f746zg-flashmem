@@ -126,7 +126,7 @@ void FLASH_AwaitNotBusy(void)
 {
   while (FLASH_IsBusy())
   {
-    HAL_Delay(10); // Short delays of 10ms
+    osDelay(10); // Short delays of 10ms
   }
 }
 
@@ -178,7 +178,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  HAL_Delay(1);
+  osDelay(1);
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
@@ -235,7 +235,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  HAL_Delay(1);
+  osDelay(1);
 }
 
 //! Erase Operations
@@ -273,7 +273,7 @@ void FLASH_EraseBlock(uint16_t blockAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  HAL_Delay(10); // Maxmimum possible erase time
+  osDelay(10); // Maximum possible erase time
 }
 
 // Resets device software and disables write protection
@@ -289,7 +289,7 @@ void FLASH_ResetDeviceSoftware(void)
 // Resets entire memory array of flash to 0xFF, and also reset software
 void FLASH_EraseDevice(void)
 {
-  // There are 40
+  // There are 40 blocks
   for (int i = 0; i < 4096; i ++)
   {
     FLASH_EraseBlock(i);
