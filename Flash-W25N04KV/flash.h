@@ -10,10 +10,11 @@
 
 #include "stm32f7xx_hal.h"
 #include <stdio.h>
-#include <stdarg.h>
+// #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+// #include <stddef.h>
 #include <math.h>
 
 #ifndef FLASH_CONSTANTS_H

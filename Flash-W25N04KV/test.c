@@ -7,11 +7,48 @@
 
 #include "flash.h"
 
+//! CRC Hash for commands
+
+#define HELP_CMD 0x8875cac
+#define RESET_DEVICE_CMD 0xa730c915
+#define REGISTER_TEST_CMD 0x8f0add03
+#define READ_WRITE_TEST_CMD 0x415ef1b4
+#define ERASE_TEST_CMD 0x5383f2ce
+#define CYCLE_TEST_CMD 0xf7bf70e
+
+// Implementation of CRC32b
+
+uint32_t crc32(const char *s, uint32_t n)
+{
+    uint32_t crc = 0xFFFFFFFF;
+
+    for (uint32_t i = 0; i < n; i++)
+    {
+        char ch = s[i];
+        for (uint32_t j = 0; j < 8; j++)
+        {
+            uint32_t b = (ch ^ crc) & 1;
+            crc >>= 1;
+            if (b)
+                crc = crc ^ 0xEDB88320;
+            ch >>= 1;
+        }
+    }
+
+    return ~crc;
+}
+
 //! Utility functions
 
-// Parse parameters given to commands as integers
-uint32_t parseParamAsInt(char *param)
+// Parse parameters given to commands as integers, defaulting if parameter is invalid
+// Pass in NULL as param to force default
+uint32_t parseParamAsInt(char *param, uint32_t defaultParam, uint32_t maxValue)
 {
+    if (param == NULL)
+    {
+        return defaultParam;
+    }
+
     char *endptr;
     unsigned long result = strtoul(param, &endptr, 10); // Convert str to unsigned integer (base 10)
 
@@ -19,32 +56,37 @@ uint32_t parseParamAsInt(char *param)
     if (*endptr != '\0' || result > UINT32_MAX)
     {
         printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", param);
-        return UINT32_MAX;
+        return defaultParam;
     }
 
-    return (uint32_t)result; // Safe cast to uint32_t
+    uint32_t intResult = (uint32_t)result;              // Safe cast to uint32_t
+    return (intResult >= maxValue) ? maxValue : result; // Clamp value to maximum
 }
 
-// Checks if a token is a valid integer
-bool validInt(char *param)
+// Checks if a given string is all spaces
+bool isAllSpaces(char *str)
 {
-    return parseParamAsInt(param) != UINT32_MAX; // Safe cast to uint32_t
-}
+    // Iterate through each character in the string
+    while (*str != '\0')
+    {
+        if (*str != ' ')
+        {
+            return false;
+        }
+        str++;
+    }
 
-// Helper function to clamp values
-uint32_t clamp(uint32_t value, uint32_t max)
-{
-    return (value >= max) ? max : value;
+    return true;
 }
 
 //! Command functions
 
 // Listens for user input and submits when enter is pressed, storing results in buffers
-void UART_ListenInput(char *inputBuffer, int *inputLen)
+void UART_ListenInput(char *inputBuf, int *inputLen)
 {
     uint8_t receivedByte;
     uint8_t index = 0;
-    char commandBuffer[MAX_INPUT_LEN]; //! == {0} here?
+    char cmdBuf[MAX_INPUT_LEN];
 
     while (true)
     {
@@ -53,7 +95,7 @@ void UART_ListenInput(char *inputBuffer, int *inputLen)
         {
             if (receivedByte == 0x0D) // Enter
             {
-                commandBuffer[index] = '\0';
+                cmdBuf[index] = '\0';
                 printf("\r\n");
                 break;
             }
@@ -70,22 +112,18 @@ void UART_ListenInput(char *inputBuffer, int *inputLen)
                 // Add character to buffer and print it
                 if (index < MAX_INPUT_LEN - 1)
                 {
-                    commandBuffer[index] = receivedByte;
+                    cmdBuf[index] = receivedByte;
                     printf("%c", (char)receivedByte);
                     index++;
-                }
-                else
-                {
-                    continue;
                 }
             }
         }
     }
 
     // Copy input to the result buffer safely
-    if (inputBuffer != NULL)
+    if (inputBuf != NULL)
     {
-        strncpy(inputBuffer, commandBuffer, MAX_INPUT_LEN);
+        strncpy(inputBuf, cmdBuf, MAX_INPUT_LEN);
     }
 
     // Return input length if resultLen is valid
@@ -103,25 +141,15 @@ void FLASH_ListenCommands(void)
     int cmdLen;
     UART_ListenInput(cmdBuf, &cmdLen);
     // Ensure command is valid
-    if (cmdBuf == NULL || cmdBuf[0] == '\0' || cmdLen == 0)
+    if (cmdBuf == NULL || cmdBuf[0] == '\0' || cmdLen == 0 || isAllSpaces(cmdBuf))
     {
         return;
     }
-
-    // If valid, put cmd into another array of approppriate size
-    char *cmd = (char *)malloc(cmdLen + 1); // +1 for null terminator
-    if (cmd == NULL)
-    {
-        printf("Memory allocation failed\r\n");
-        return;
-    }
-    strncpy(cmd, cmdBuf, cmdLen);
-    cmd[cmdLen] = '\0';
 
     // Parse into command and arguments
-    char *tokens[10]; // List to store tokens
+    char *tokens[10]; // List to store tokens, max of 10
     int tokenCount = 0;
-    char *token = strtok(cmd, " ");
+    char *token = strtok(cmdBuf, " ");
     while (token != NULL && tokenCount < 10)
     {
         tokens[tokenCount] = token;
@@ -130,53 +158,61 @@ void FLASH_ListenCommands(void)
     }
 
     // Clean up and run
-    FLASH_ParseCommand(tokens, tokenCount);
-    free(cmd);
+    FLASH_RunCommand(tokens, tokenCount);
 }
 
 // Parses a list of tokens as a command given to the flash memory drive
-void FLASH_ParseCommand(char *tokens[10], uint8_t tokenCount)
+void FLASH_RunCommand(char *tokens[10], uint8_t tokenCount)
 {
     char *cmd = tokens[0];
     uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68};
 
     // Parse and run each command
-    if (strcmp(cmd, "help") == 0) // TODO: Display documentation
+    switch (crc32(cmd, strlen(cmd)))
     {
+    case HELP_CMD:
         FLASH_GetCommandHelp();
-    }
-    else if (strcmp(cmd, "reset-device") == 0)
-    {
+        break;
+    case RESET_DEVICE_CMD:
         FLASH_ResetDeviceCmd();
-    }
-    else if (strcmp(cmd, "register-test") == 0) // Test reads and writes
-    {
+        break;
+    case REGISTER_TEST_CMD:
         FLASH_TestRegisters();
-    }
-    else if (strcmp(cmd, "read-write-test") == 0) // Test reads and writes
-    {
-        uint32_t testPageAddress = (tokenCount >= 2 && validInt(tokens[1])) ? parseParamAsInt(tokens[1]) : 1;
-        testPageAddress = clamp(testPageAddress, 262143);
+        break;
+    case READ_WRITE_TEST_CMD:
+        //! REWRITE THE BELOW COMMANDS AND THEN COMMIT, WORK ON UART INTERRUPT AND UPDATE NOTES
+        uint32_t testPageAddress = 1;
+        if (tokenCount >= 2)
+        {
+            testPageAddress = parseParamAsInt(tokens[1], testPageAddress, 262143);
+        }
+        // Run the command
         FLASH_TestReadWrite(testData, testPageAddress);
-    }
-    else if (strcmp(cmd, "erase-test") == 0)
-    {
-        uint16_t testBlockAddress = (tokenCount >= 2 && validInt(tokens[1])) ? parseParamAsInt(tokens[1]) : 0;
-        testBlockAddress = clamp(testBlockAddress, 4094);
+        break;
+    case ERASE_TEST_CMD:
+        uint16_t testBlockAddress = 0;
+        if (tokenCount >= 2)
+        {
+            testBlockAddress = parseParamAsInt(tokens[1], testBlockAddress, 4094);
+        }
+        // Run the command
         FLASH_TestErase(testData, testBlockAddress);
-    }
-    else if (strcmp(cmd, "cycle-test") == 0)
-    {
-        uint32_t cycleCount = (tokenCount >= 2 && validInt(tokens[1])) ? parseParamAsInt(tokens[1]) : 1;
-        uint32_t pageCount = (tokenCount >= 3 && validInt(tokens[2])) ? parseParamAsInt(tokens[2]) : 262144;
-        cycleCount = (cycleCount, 256);
-        pageCount = clamp(pageCount, 262144);
-
+        break;
+    case CYCLE_TEST_CMD:
+        uint32_t cycleCount = 1;
+        uint32_t pageCount = 262144;
+        if (tokenCount >= 2)
+        {
+            cycleCount = parseParamAsInt(tokens[1], cycleCount, UINT32_MAX);
+        }
+        if (tokenCount >= 3)
+        {
+            pageCount = parseParamAsInt(tokens[2], pageCount, 262144);
+        };
         // Run the command
         FLASH_TestCycle(testData, cycleCount, pageCount);
-    }
-    else
-    {
+        break;
+    default:
         printf("Invalid Command\r\n");
     }
 }
@@ -491,7 +527,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
     uint16_t eraseCount = ceil(pageCount / 64);
 
     // Log the parameters of the cycle test
-    printf("Data of size %u bytes requires %u write(s) per page. Test will write from page 0 to page %u\r\n", sizeOfData, writesPerPage, pageCount - 1);
+    printf("Data of size %u bytes requires %u write(s) per page.\r\nTest will write from page 0 to page %u\r\n", sizeOfData, writesPerPage, pageCount - 1);
     printf("Page currently being written to will be logged every 10,000 pages\r\n");
     printf("Block currently erased is logged every 100 blocks\r\n");
 
@@ -508,7 +544,7 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
             for (int w = 0; w < writesPerPage; w++)
             {
                 FLASH_WriteBuffer(writtenData, sizeOfData, w * sizeOfData);
-            }
+            }    
             FLASH_WriteExecute(p);
             if ((p + 1) % 10000 == 0)
             {
