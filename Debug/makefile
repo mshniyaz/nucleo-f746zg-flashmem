@@ -65,8 +65,8 @@ all: main-build
 main-build: nucleo-f746zg-flashmem.elf secondary-outputs
 
 # Tool invocations
-nucleo-f746zg-flashmem.elf nucleo-f746zg-flashmem.map: $(OBJS) $(USER_OBJS) /home/niyaz/STM32CubeIDE/workspace_1.17.0/nucleo-f746zg-flashmem/STM32F746ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "nucleo-f746zg-flashmem.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/niyaz/STM32CubeIDE/workspace_1.17.0/nucleo-f746zg-flashmem/STM32F746ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="nucleo-f746zg-flashmem.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+nucleo-f746zg-flashmem.elf nucleo-f746zg-flashmem.map: $(OBJS) $(USER_OBJS) /home/niyaz/Desktop/nucleo-f746zg-flashmem/STM32F746ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "nucleo-f746zg-flashmem.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/niyaz/Desktop/nucleo-f746zg-flashmem/STM32F746ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="nucleo-f746zg-flashmem.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

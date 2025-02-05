@@ -7,8 +7,9 @@
 
 #include "flash.h"
 
-//! CRC Hash for commands
+//! Macros for CRC and compile-time constants
 
+#define MAX_CMD_LENGTH 64
 #define HELP_CMD 0x8875cac
 #define RESET_DEVICE_CMD 0xa730c915
 #define REGISTER_TEST_CMD 0x8f0add03
@@ -80,10 +81,11 @@ bool isAllSpaces(char *str)
 }
 
 //! Buffers for input processing
-volatile uint8_t receivedByte;
-volatile uint8_t cmdIndex = 0;
-static volatile char cmdBuf[100]; // Maxmimum input length of 100
-volatile bool listeningCommands = false;
+
+uint8_t receivedByte;
+uint8_t cmdIndex = 0;
+char cmdBuf[MAX_CMD_LENGTH]; // Maxmimum input length of 100
+bool listeningCommands = false;
 
 //! Command functions
 
@@ -130,7 +132,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     else
     {
         // Add character to buffer and print it
-        if (cmdIndex < 100 - 1)
+        if (cmdIndex < MAX_CMD_LENGTH - 1)
         {
             cmdBuf[cmdIndex] = receivedByte;
             printf("%c", (char)receivedByte);
