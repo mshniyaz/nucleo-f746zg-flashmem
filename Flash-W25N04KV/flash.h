@@ -11,15 +11,14 @@
 #include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_uart.h"
 #include <stdio.h>
-// #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-// #include <stddef.h>
 #include <math.h>
 
 #ifndef FLASH_CONSTANTS_H
 #define FLASH_CONSTANTS_H
+
 // Instruction Set Constants
 static const uint8_t RESET_DEVICE = 0xFF;
 static const uint8_t GET_JEDEC = 0x9F;
@@ -43,8 +42,32 @@ static const uint8_t *REGISTERS[] = {
     &REGISTER_THREE};
 
 // Timeout to use for all communications (in ms)
-static const uint32_t COM_TIMEOUT = 100;
+#define COM_TIMEOUT 100
+
 #endif /* FLASH_CONSTANTS_H */
+
+// Track position of packets on Flash
+typedef struct {
+    uint32_t head; // Byte address of buffer head
+    uint32_t tail; // Byte address of buffer tail
+} circularBuffer;
+
+// Packet of data
+typedef struct {
+    uint8_t dummy; // Dummy byte signifying start of page, non-FF
+    uint8_t pl[337]; // Payload of the packet (useful data)
+} pkt;
+
+// Page of packets
+typedef struct {
+    pkt packetArray[6]; // Array of all 6 packets within the page
+    uint8_t padding[20]; // Padding at end of each page
+} pageRead; // Structure of bytes read from an entire page
+
+union pageStructure {
+    pageRead page; // Contains structured page data
+    uint8_t bytes[sizeof(pageRead)]; // Contains raw page data (for portability)
+};
 
 // SPI and UART handling types, must be defined in main.c
 extern SPI_HandleTypeDef hspi1;

@@ -16,6 +16,7 @@
 #define READ_WRITE_TEST_CMD 0x415ef1b4
 #define ERASE_TEST_CMD 0x5383f2ce
 #define CYCLE_TEST_CMD 0xf7bf70e
+#define HEAD_TAIL_TEST 0x84c67266
 
 // Implementation of CRC32b
 
@@ -80,12 +81,41 @@ bool isAllSpaces(char *str)
     return true;
 }
 
+// Finds the head and tail of the flash and stores it into a circular buffer
+void findHeadTail(circularBuffer *buf)
+{
+    bool headFound = false;      // Tracks whether the head has been found
+    union pageStructure pageBuf; // Buffer to store the page data
+
+    for (int p = 0; p < 3; p++)
+    {
+        FLASH_ReadPage(p);
+        FLASH_ReadBuffer(0, 2048, pageBuf.bytes);
+
+        // Check first byte of every packet
+        for (int i = 0; i < 6; i++)
+        {
+            pkt packet = pageBuf.page.packetArray[i];
+            // printf("\r\n%u, %u, %x\r\n", p, i, packet.dummy);
+            if (packet.dummy != 0xFF)
+            {
+                if (!headFound)
+                {
+                    buf->head = p * 2048 + i * sizeof(pkt);
+                    headFound = true;
+                }
+                buf->tail = p * 2048 + (i + 1) * sizeof(pkt);
+            }
+        }
+    }
+}
+
 //! Buffers for input processing
 
-uint8_t receivedByte;
-uint8_t cmdIndex = 0;
-char cmdBuf[MAX_CMD_LENGTH]; // Maxmimum input length of 100
-bool listeningCommands = false;
+volatile int8_t receivedByte;
+volatile uint8_t cmdIndex = 0;
+volatile char cmdBuf[MAX_CMD_LENGTH]; // Maxmimum input length of 100
+volatile bool listeningCommands = false;
 
 //! Command functions
 
@@ -204,10 +234,15 @@ void FLASH_RunCommand(char *tokens[10], uint8_t tokenCount)
         // Run the command
         FLASH_TestCycle(testData, cycleCount, pageCount);
         break;
+    case HEAD_TAIL_TEST:
+        FLASH_TestHeadTail();
+        break;
     default:
         printf("Invalid Command\r\n");
     }
 }
+
+//! Functions that run each command
 
 // Print out man.txt to help users
 void FLASH_GetCommandHelp(void)
@@ -424,18 +459,15 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
 
     // Fillup all of blocks testBlockAddress and testBlockAddress+1 with test data
     printf("\r\nTesting erase capabilities, please ensure device is wiped before test\r\n");
-    printf("\r\nFilling all of blocks %u and %u with test data (0x%02X%02X%02X%02X)\r\n\n",
+    printf("\r\nFilling all pages of blocks %u and %u with test data (0x%02X%02X%02X%02XFFFF...)\r\n\n",
            testBlockAddress, testBlockAddress + 1, testData[0], testData[1], testData[2], testData[3]);
     for (uint32_t p = testBlockAddress * 64; p < testBlockAddress * 64 + 128; p++)
     {
-        for (int i = 0; i < 2024; i += 4)
-        {
-            FLASH_WriteBuffer(testData, 4, i);
-        }
+        FLASH_WriteBuffer(testData, 4, 0);
         FLASH_WriteExecute(p);
-        // printf("%u\r\n", p);
+        FLASH_ReadPage(p);
+        FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
     }
-    osDelay(100);
 
     // Verify that page at test address has been filled
     printf("Loading first page of block %u into buffer\r\n", testBlockAddress);
@@ -445,7 +477,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Data was correctly written to block %u\r\n\n", testBlockAddress);
+        printf("[PASSED] Data was correctly written to page %u (block %u)\r\n\n", testBlockAddress * 64, testBlockAddress + 1);
     }
     else
     {
@@ -453,7 +485,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
         return 0;
     }
 
-    // Verify that page 64 has been filled
+    // Verify that first page of subsequent block has been filled
     printf("Loading first page of block %u into buffer\r\n", testBlockAddress + 1);
     FLASH_ReadPage(testBlockAddress * 64 + 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect full
@@ -461,7 +493,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Data was correctly written to block %u\r\n\n", testBlockAddress + 1);
+        printf("[PASSED] Data was correctly written to page %u (block %u)\r\n\n", testBlockAddress * 64 + 64, testBlockAddress + 1);
     }
     else
     {
@@ -469,16 +501,16 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
         return 0;
     }
 
-    // Erase block 0 and verify that page 0 has been erased
+    // Erase test block and verify that its first page has been erased
     printf("Erased block %u only and loaded its first page into data buffer\r\n", testBlockAddress);
-    FLASH_EraseBlock(0);
-    FLASH_ReadPage(0);
+    FLASH_EraseBlock(testBlockAddress);
+    FLASH_ReadPage(testBlockAddress * 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
     printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Data was correctly wiped from block %u\r\n\n", testBlockAddress);
+        printf("[PASSED] Data was correctly wiped from page %u (block %u)\r\n\n", testBlockAddress * 64, testBlockAddress);
     }
     else
     {
@@ -486,7 +518,23 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
         return 0;
     }
 
-    // Verify that block 1 has not been erased
+    // Verify that subsequent has also been erased
+    printf("Loaded second page of first block into data buffer\r\n", testBlockAddress);
+    FLASH_ReadPage(testBlockAddress * 64 + 1);
+    FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
+    printf("Buffer at bit address 0x00: 0x%02X%02X%02X%02X\r\n",
+           readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+    if (memcmp(readResponse, emptyResponse, sizeof(readResponse)) == 0)
+    {
+        printf("[PASSED] Data was correctly wiped from page %u (block %u)\r\n\n", testBlockAddress * 64 + 1, testBlockAddress);
+    }
+    else
+    {
+        printf("[ERROR] Failed to erase block %u\r\n\n", testBlockAddress);
+        return 0;
+    }
+
+    // Verify that subsequent block has not been erased
     printf("Loaded non-erased block %u's first page into data buffer\r\n", testBlockAddress + 1);
     FLASH_ReadPage(testBlockAddress * 64 + 64);
     FLASH_ReadBuffer(0, 4, readResponse); //! Expect empty
@@ -494,7 +542,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
            readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
     if (memcmp(readResponse, testData, sizeof(readResponse)) == 0)
     {
-        printf("[PASSED] Block %u was not erroneously erased\r\n\n", testBlockAddress + 1);
+        printf("[PASSED] Page %u (block %u) was not erroneously erased\r\n\n", testBlockAddress * 64 + 64, testBlockAddress + 1);
     }
     else
     {
@@ -502,7 +550,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
         return 0;
     }
 
-    FLASH_ReadPage(0);
+    FLASH_ReadPage(testBlockAddress * 64);
     printf("All tests passed\r\n\n");
     return 1;
 }
@@ -511,7 +559,7 @@ int FLASH_TestErase(uint8_t testData[4], uint32_t testBlockAddress)
 void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount)
 {
     printf("\r\nTest write and erase for %u cycle(s)\r\n", cycleCount);
-    uint8_t writtenData[1024] = {0}; // Array of all 0 to overwrite 0xFF
+    uint8_t writtenData[2048] = {0}; // Array of all 0 to overwrite 0xFF
 
     // Set some constants
     uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
@@ -560,4 +608,61 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
     }
 
     printf("\r\nCompleted write-erase cycle, run \"read-write-test\" to check flash integrity\r\n\n");
+}
+
+// Test if the flash memory is able to find head and tail given data with gaps
+void FLASH_TestHeadTail(void)
+{
+    // Test packet of data
+    uint8_t testPacket[338] = {
+        0x45, 0x8D, 0x35, 0x92, 0x3C, 0xA4, 0x1D, 0xC4, 0x79, 0xEB, 0x41, 0x5F, 0x4B, 0xB4, 0xCC, 0x49,
+        0x02, 0x53, 0x24, 0x97, 0x0F, 0x15, 0x4E, 0x87, 0xD8, 0xA1, 0x31, 0xE4, 0x40, 0xDC, 0xF0, 0x6C,
+        0x68, 0x36, 0xAA, 0x31, 0xC2, 0x59, 0x8C, 0x35, 0x44, 0xB5, 0x81, 0xB5, 0xE6, 0x92, 0x2A, 0x35,
+        0x56, 0x0D, 0x43, 0x28, 0xF1, 0x6D, 0xB2, 0x54, 0xA4, 0x1F, 0xB2, 0xF3, 0x40, 0xA0, 0x83, 0x29,
+        0x3C, 0x86, 0xE7, 0x93, 0x09, 0xCB, 0x3A, 0xA9, 0xEC, 0x40, 0xED, 0x26, 0x49, 0x9A, 0xDB, 0xF8,
+        0x13, 0x35, 0x7B, 0x56, 0x52, 0x89, 0xC4, 0xB9, 0x51, 0xAB, 0x77, 0x38, 0xA3, 0xCD, 0xD0, 0xB8,
+        0x6C, 0x8F, 0x42, 0x96, 0x27, 0x8A, 0xCE, 0xC1, 0x58, 0x2C, 0xE0, 0xAF, 0x2D, 0xF9, 0xAF, 0xAF,
+        0xA3, 0xC2, 0x12, 0x22, 0x43, 0xBC, 0x72, 0x5F, 0x32, 0xA3, 0xA0, 0x66, 0xC2, 0xE7, 0xD1, 0x5C,
+        0x59, 0xB5, 0x6C, 0xCB, 0x1D, 0x6D, 0x77, 0x4F, 0x39, 0x8F, 0x96, 0x5A, 0xE0, 0xD1, 0xF6, 0x24,
+        0xEA, 0xBF, 0xFC, 0x81, 0xAF, 0xA6, 0xDB, 0x60, 0xA5, 0x3B, 0x00, 0xC7, 0xB1, 0x43, 0x2C, 0xB7,
+        0xF5, 0xC7, 0xCE, 0x3B, 0x7F, 0x56, 0xDB, 0x7E, 0xCE, 0x8C, 0x34, 0xDF, 0x45, 0xCA, 0xCB, 0x42,
+        0x97, 0x16, 0xB3, 0xA1, 0x14, 0x54, 0x0C, 0xB1, 0x96, 0xC7, 0x11, 0xF8, 0x24, 0xBE, 0x97, 0xFA,
+        0x7C, 0x00, 0xF0, 0x7E, 0x73, 0x12, 0x24, 0xF7, 0xBD, 0xAA, 0xC5, 0xDC, 0x98, 0x64, 0x69, 0x7E,
+        0xF3, 0x43, 0xF0, 0xE0, 0x21, 0xF6, 0xA1, 0xED, 0x39, 0xF3, 0x08, 0xC0, 0xEF, 0x98, 0x97, 0xCD,
+        0x4E, 0xF2, 0x69, 0x38, 0xC7, 0x48, 0x15, 0x42, 0x7C, 0xCA, 0xB0, 0xA8, 0xF8, 0xF1, 0x97, 0x2E,
+        0x3D, 0xD7, 0xA4, 0x4B, 0xB8, 0xC2, 0x92, 0xBF, 0xD8, 0x57, 0x64, 0xF2, 0x3A, 0xA4, 0x38, 0x3F,
+        0x7C, 0x88, 0xEA, 0xB1, 0x1D, 0x66, 0xD9, 0x28, 0xC2, 0x4C, 0x2D, 0x1F, 0xD9, 0xBB, 0xFB, 0x73,
+        0x3E, 0xE1, 0xAA, 0x73, 0x3B, 0x47, 0x4B, 0x3A, 0x2F, 0xFA, 0xF0, 0x47, 0x1D, 0x35, 0xC7, 0x9D,
+        0x48, 0xCC, 0xF0, 0x5A, 0x5D, 0x50, 0xBA, 0x5F, 0xED, 0x7A, 0x05, 0x33, 0x90, 0x04, 0x14, 0x27,
+        0xFB, 0xFC, 0x05, 0x75, 0x96, 0xD0, 0xF1, 0xAD, 0x62, 0x58, 0x8B, 0x5F, 0xFC, 0xDB, 0xE7, 0x8A,
+        0x51, 0x59, 0x83, 0x7A, 0xB2, 0x29, 0x62, 0xC0, 0xFB, 0x71, 0xA1, 0x99, 0x84, 0x25, 0xB8, 0x11,
+        0x48, 0x4A};
+
+    // Data read buffer and test data
+    circularBuffer buf = {0, 0, 338};
+
+    //! TODO: REMOVE THE BELOW
+    void testRead()
+    {
+        uint8_t readResponse[4];
+        FLASH_ReadBuffer(0, 4, readResponse);
+        printf("\r\n%02X, %02X, %02X, %02X\r\n", readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
+    }
+
+    // Write the test packet to some locations on page 0 (Contiguous packet case)
+    FLASH_WriteBuffer(testPacket, 338, 0);
+    FLASH_WriteBuffer(testPacket, 338, 338);
+    FLASH_WriteBuffer(testPacket, 338, 338 * 2);
+    FLASH_WriteExecute(1);
+
+    testRead(); //TODO: Replace this with a delay
+    
+    FLASH_WriteBuffer(testPacket, 338, 0);
+    testRead(); //TODO: Replace this with a delay
+    FLASH_WriteExecute(2);
+
+    // Apply algorithm to find head and tail
+    findHeadTail(&buf);
+    printf("\r\n%u, %u\r\n\r\n", buf.head, buf.tail);
+    FLASH_EraseBlock(0);
 }

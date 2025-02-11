@@ -22,7 +22,7 @@ The baud rate has been set to 9 Mbits/s to facilitate fast writing and erasing o
 
 FreeRTOS has been enabled with a single task, `ListenCommands`, running at the lowest priority. This task constantly listens for input from a CLI transmitted to the MCU via UART.
 
-- The task is assigned a stack size of 1024 (A lower stack size may cause a HardFault), which can be adjusted under **Middleware > FreeRTOS > Tasks & Queues > ListenCommands**.
+- The task is assigned a stack size of 2048 (A lower stack size may cause a HardFault), which can be adjusted under **Middleware > FreeRTOS > Tasks & Queues > ListenCommands**.
 - FreeRTOS uses SYSTICK, and hence a different timer, `TIM6` is used for HAL. The timer used for HAL can be changed under **System Core > SYS > Timebase Source**.
 
 ### Pinout Configuration

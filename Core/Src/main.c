@@ -52,8 +52,8 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t ListenCommandsHandle;
 const osThreadAttr_t ListenCommands_attributes = {
   .name = "ListenCommands",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 2048 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for commandQueue */
 osMessageQueueId_t commandQueueHandle;
@@ -96,7 +96,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
   __HAL_DBGMCU_FREEZE_TIM6();       // Freeze TIM6 during debug halt
-  setvbuf(stdout, NULL, _IONBF, 0); //! Disable buffering for stdout (May affect performance?)
+  setvbuf(stdout, NULL, _IONBF, 0); //! Disables buffering for stdout (May affect performance?)
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -241,7 +241,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -464,7 +464,7 @@ void listenCommands(void *argument)
   for (;;)
   {
     FLASH_ListenCommands();
-    osDelay(100);
+    osDelay(1000);
   }
 
   // In case we accidentally exit from task loop

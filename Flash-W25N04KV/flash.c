@@ -67,7 +67,7 @@ void FLASH_DummyClock(void)
 }
 
 // Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
-void uitn32GetLastThreeBits(uint32_t n, uint8_t *threeLSB)
+void uint32GetLastThreeBits(uint32_t n, uint8_t *threeLSB)
 {
   for (int i = 0; i <= 2; i++)
   {
@@ -170,7 +170,7 @@ void FLASH_ReadJEDECID(void)
 void FLASH_ReadPage(uint32_t pageAddress)
 {
   uint8_t truncatedPageAddress[3];
-  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
@@ -221,13 +221,14 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
   FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_Transmit(data, size);
   FLASH_CS_High();
+  osDelay(1);
 }
 
 // Write data in buffer to a page with a 3 byte address (Only up to end of page, extra data discarded)
 void FLASH_WriteExecute(uint32_t pageAddress)
 {
   uint8_t truncatedPageAddress[3];
-  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
@@ -242,13 +243,13 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 
 // Erase the entire data buffer
 void FLASH_EraseBuffer(void) {
-  uint8_t columnAddressByteArray[2] = {0, 0};
+  uint16_t columnAddress = 0;
 
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_BUFFER_WITH_RESET, 1);
-  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(&columnAddress, 2); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_CS_High();
 }
 
@@ -264,7 +265,7 @@ void FLASH_EraseBlock(uint16_t blockAddress)
   // FInd page address
   uint32_t pageAddress = blockAddress * 64; // Address of first page in block
   uint8_t truncatedPageAddress[3];
-  uitn32GetLastThreeBits(pageAddress, truncatedPageAddress);
+  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
 
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
