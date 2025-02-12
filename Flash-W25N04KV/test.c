@@ -110,88 +110,79 @@ void findHeadTail(circularBuffer *buf)
     }
 }
 
-//! Buffers for input processing
-
-volatile int8_t receivedByte;
-volatile uint8_t cmdIndex = 0;
-volatile char cmdBuf[MAX_CMD_LENGTH]; // Maxmimum input length of 100
-volatile bool listeningCommands = false;
-
 //! Command functions
+volatile uint8_t receivedByte;
+volatile uint8_t cmdIndex = 0;
+volatile char cmdBuf[MAX_CMD_LENGTH];
 
 // UART receive callback function for interrupt-driven polling
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (receivedByte == 0x0D) // Enter
     {
+        // Null terminate and send command to queue
         cmdBuf[cmdIndex] = '\0';
+        osMessageQueuePut(uartQueueHandle, cmdBuf, 0, 0);
         printf("\r\n");
-
-        // Parse and run the command
-        if (cmdBuf == NULL || cmdBuf[0] == '\0' || cmdIndex == 0 || isAllSpaces(cmdBuf))
-        {
-            // Do nothing
-        }
-        else
-        {
-            // Tokenize the string
-            char *tokens[10]; // Max of 10 tokens
-            int tokenCount = 0;
-            char *token = strtok(cmdBuf, " ");
-            while (token != NULL && tokenCount < 10)
-            {
-                tokens[tokenCount] = token;
-                tokenCount++;
-                token = strtok(NULL, " ");
-            }
-            FLASH_RunCommand(tokens, tokenCount);
-        }
-
         // Reset input tracking to prep for next command input
         cmdIndex = 0;
-        listeningCommands = false;
     }
     else if (receivedByte == 0x08) // Backspace
     {
         if (cmdIndex > 0)
         {
-            cmdIndex--;
             printf("\b \b"); // Erase the last character on the terminal
+            cmdIndex--;
         }
+        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
     }
     else
     {
         // Add character to buffer and print it
-        if (cmdIndex < MAX_CMD_LENGTH - 1)
+        if (cmdIndex < MAX_CMD_LENGTH - 2)
         {
             cmdBuf[cmdIndex] = receivedByte;
             printf("%c", (char)receivedByte);
             cmdIndex++;
         }
+        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
     }
-
-    HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
 }
 
-// Listens for commands transmitted to the MCU via UART for testing the flash
+// Begins listening for commands
 void FLASH_ListenCommands(void)
 {
-    if (!listeningCommands)
-    {
-        printf("cmd: ");
-        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
-        listeningCommands = true;
-    }
+    printf("cmd: ");
+    HAL_UART_Receive_IT(&huart3, &receivedByte, 1); // Start receiving the first byte
 }
 
 // Parses a list of tokens as a command given to the flash memory drive
-void FLASH_RunCommand(char *tokens[10], uint8_t tokenCount)
+void FLASH_RunCommand(char *cmdStr)
 {
-    char *cmd = tokens[0];
-    uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68};
+    // Parse the command into tokens
+    char *tokens[10]; // Max of 10 tokens
+    int tokenCount = 0;
+    if (cmdStr != NULL && cmdStr[0] != '\0' && strlen(cmdStr) != 0 && !isAllSpaces(cmdStr))
+    {
+        char *token = strtok(cmdStr, " "); // Sequentially get tokens
+        while (token != NULL && tokenCount < 10)
+        {
+            tokens[tokenCount] = token;
+            tokenCount++;
+            token = strtok(NULL, " ");
+        }
+    }
+    else
+    {
+        return;
+    }
 
     // Parse and run each command
-    switch (crc32(cmd, strlen(cmd)))
+    char *cmd = tokens[0];
+    uint32_t cmdCRC = crc32(cmd, strlen(cmd));
+    uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68}; // Default test data
+
+    switch (cmdCRC)
     {
     case HELP_CMD:
         FLASH_GetCommandHelp();
@@ -592,7 +583,6 @@ void FLASH_TestCycle(uint8_t testData[4], uint8_t cycleCount, uint32_t pageCount
             }
         }
         printf("Write complete\r\n\n");
-        osDelay(100);
 
         // Erase pages required
         printf("Starting erase process\r\n");
@@ -641,24 +631,12 @@ void FLASH_TestHeadTail(void)
     // Data read buffer and test data
     circularBuffer buf = {0, 0, 338};
 
-    //! TODO: REMOVE THE BELOW
-    void testRead()
-    {
-        uint8_t readResponse[4];
-        FLASH_ReadBuffer(0, 4, readResponse);
-        printf("\r\n%02X, %02X, %02X, %02X\r\n", readResponse[0], readResponse[1], readResponse[2], readResponse[3]);
-    }
-
     // Write the test packet to some locations on page 0 (Contiguous packet case)
     FLASH_WriteBuffer(testPacket, 338, 0);
     FLASH_WriteBuffer(testPacket, 338, 338);
     FLASH_WriteBuffer(testPacket, 338, 338 * 2);
     FLASH_WriteExecute(1);
-
-    testRead(); //TODO: Replace this with a delay
-    
     FLASH_WriteBuffer(testPacket, 338, 0);
-    testRead(); //TODO: Replace this with a delay
     FLASH_WriteExecute(2);
 
     // Apply algorithm to find head and tail

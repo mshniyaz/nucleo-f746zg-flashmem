@@ -55,10 +55,10 @@ const osThreadAttr_t ListenCommands_attributes = {
   .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
-/* Definitions for commandQueue */
-osMessageQueueId_t commandQueueHandle;
-const osMessageQueueAttr_t commandQueue_attributes = {
-  .name = "commandQueue"
+/* Definitions for uartQueue */
+osMessageQueueId_t uartQueueHandle;
+const osMessageQueueAttr_t uartQueue_attributes = {
+  .name = "uartQueue"
 };
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -113,7 +113,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   // Read JEDEC
-  HAL_Delay(3000);
+  HAL_Delay(1000);
   FLASH_ReadJEDECID();
   FLASH_ResetDeviceSoftware();
   /* USER CODE END 2 */
@@ -134,8 +134,8 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
-  /* creation of commandQueue */
-  commandQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &commandQueue_attributes);
+  /* creation of uartQueue */
+  uartQueueHandle = osMessageQueueNew (64, 64, &uartQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -241,7 +241,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -460,11 +460,18 @@ PUTCHAR_PROTOTYPE
 void listenCommands(void *argument)
 {
   /* USER CODE BEGIN 5 */
+  char receivedCommand[64]; // Buffer to track received command
+  FLASH_ListenCommands();   // Begin listening for user input
+
   /* Infinite loop */
   for (;;)
   {
-    FLASH_ListenCommands();
-    osDelay(1000);
+    // Wait indefinitely for a full command
+    if (osMessageQueueGet(uartQueueHandle, receivedCommand, NULL, osWaitForever) == osOK)
+    {
+      FLASH_RunCommand(receivedCommand);
+      FLASH_ListenCommands(); // Restart listening for next command
+    }
   }
 
   // In case we accidentally exit from task loop

@@ -126,7 +126,7 @@ void FLASH_AwaitNotBusy(void)
 {
   while (FLASH_IsBusy())
   {
-    osDelay(10); // Short delays of 10ms
+    HAL_Delay(1); //TODO: Short delays of 1ms, any better delay?
   }
 }
 
@@ -178,7 +178,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  osDelay(1);
+  HAL_Delay(1); // TODO: Should be 25 microseconds
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
@@ -221,7 +221,6 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
   FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_Transmit(data, size);
   FLASH_CS_High();
-  osDelay(1);
 }
 
 // Write data in buffer to a page with a 3 byte address (Only up to end of page, extra data discarded)
@@ -236,7 +235,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  osDelay(1);
+  HAL_Delay(1); //TODO: Should be 700 microseconds
 }
 
 //! Erase Operations
@@ -274,7 +273,7 @@ void FLASH_EraseBlock(uint16_t blockAddress)
   // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
   FLASH_Transmit(truncatedPageAddress, 3);
   FLASH_CS_High();
-  osDelay(10); // Maximum possible erase time
+  HAL_Delay(10); // Maximum possible erase time
 }
 
 // Resets device software and disables write protection
