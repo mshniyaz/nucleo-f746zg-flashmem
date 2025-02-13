@@ -60,6 +60,11 @@ osMessageQueueId_t uartQueueHandle;
 const osMessageQueueAttr_t uartQueue_attributes = {
   .name = "uartQueue"
 };
+/* Definitions for cmdParamQueue */
+osMessageQueueId_t cmdParamQueueHandle;
+const osMessageQueueAttr_t cmdParamQueue_attributes = {
+  .name = "cmdParamQueue"
+};
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
 
@@ -112,7 +117,6 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  // Read JEDEC
   HAL_Delay(1000);
   FLASH_ReadJEDECID();
   FLASH_ResetDeviceSoftware();
@@ -136,6 +140,9 @@ int main(void)
   /* Create the queue(s) */
   /* creation of uartQueue */
   uartQueueHandle = osMessageQueueNew (64, 64, &uartQueue_attributes);
+
+  /* creation of cmdParamQueue */
+  cmdParamQueueHandle = osMessageQueueNew (8, sizeof(uint32_t), &cmdParamQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -241,7 +248,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;

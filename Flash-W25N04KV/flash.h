@@ -78,6 +78,7 @@ union pageStructure
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart3;
 extern osMessageQueueId_t uartQueueHandle;
+extern osMessageQueueId_t cmdParamQueueHandle;
 
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
@@ -98,8 +99,20 @@ void FLASH_EraseBlock(uint16_t blockAddress);
 void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 
-// Testing Functions
+// Circular Buffer Functions
+void FLASH_FindHeadTail(circularBuffer *buf);
+
+// CLI Listening Functions
 void FLASH_ListenCommands(void);
 void FLASH_RunCommand(char *cmdStr);
+// Testing functions
+void FLASH_ResetDeviceCmd(void);
+void FLASH_TestCycleCmd(void);
+
+// // TODO: Combine the below?
+// void FLASH_TestRegistersCmd(void);
+// int FLASH_TestReadWriteCmd(uint8_t testData[4], uint32_t testPageAddress);
+// int FLASH_TestEraseCmd(uint8_t testData[4], uint32_t testBlockAddress);
+// void FLASH_TestHeadTailCmd(void)
 
 #endif /* FLASH_H_ */
