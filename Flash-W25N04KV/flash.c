@@ -1,10 +1,3 @@
-/*
- * flash.c
- *
- *  Created on: Dec 9, 2024
- *      Author: niyaz
- */
-
 #include "flash.h"
 
 //! General Operations
@@ -66,14 +59,6 @@ void FLASH_DummyClock(void)
   FLASH_Transmit(&dummy_byte, 1);
 }
 
-// TODO: Remove the below convenience function and replace its usage
-// Convert uint16_t to a big endian byte array
-void uint16ToByteArray(uint16_t n, uint8_t *byteArray)
-{
-  byteArray[0] = (n >> 8) & 0xFF;
-  byteArray[1] = n & 0xFF;
-}
-
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
@@ -116,10 +101,13 @@ bool FLASH_IsBusy(void)
 // Wait till BUSY bit is cleared to zero
 void FLASH_AwaitNotBusy(void)
 {
-  while (FLASH_IsBusy())
+  if (FLASH_IsBusy())
   {
-    osDelay(1); // TODO: Short delays of 1ms, any better delay?
+    osDelay(1); // TODO: Check if there is any better delay
+    FLASH_AwaitNotBusy();
   }
+
+  return;
 }
 
 // Disable write protection for all blocks and registers
@@ -165,7 +153,8 @@ void FLASH_ReadPage(uint32_t pageAddress)
   FLASH_CS_Low();
   FLASH_Transmit(&READ_PAGE, 1);
   // Shift in 3-byte page address (last 18 bits used, others dummy)
-  FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
   osDelay(1); // TODO: Should be 25 microseconds
 }
@@ -173,14 +162,13 @@ void FLASH_ReadPage(uint32_t pageAddress)
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-  uint8_t columnAddressByteArray[2];
-  uint16ToByteArray(columnAddress, columnAddressByteArray);
+  uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF, columnAddress & 0xFF}; // Unpack into 2 bytes, ignore endianness
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&READ_BUFFER, 1);
   // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(columnAddressByteArray, 2);
+  FLASH_Transmit(columnAddressBytes, 2);
   FLASH_DummyClock();
   FLASH_Receive(readResponse, size);
   FLASH_CS_High();
@@ -199,15 +187,13 @@ void FLASH_WriteEnable(void)
 // Write to the flash memory's data buffer
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
-  uint8_t readResponse[size];
-  uint8_t columnAddressByteArray[2];
-  uint16ToByteArray(columnAddress, columnAddressByteArray);
+  uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF, columnAddress & 0xFF}; // Unpack into 2 bytes, ignore endianness
 
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_BUFFER, 1);
-  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(columnAddressBytes, 2); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_Transmit(data, size);
   FLASH_CS_High();
 }
@@ -219,7 +205,8 @@ void FLASH_WriteExecute(uint32_t pageAddress)
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_EXECUTE, 1);
   // Shift in 3-byte page address (last 18 bits used, others dummy)
-  FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
   osDelay(1); // TODO: Should be 700 microseconds
 }
@@ -242,18 +229,12 @@ void FLASH_EraseBuffer(void)
 // Erase the given block address without any delay, returning status register after
 int FLASH_EraseWithoutDelay(uint16_t blockAddress)
 {
-  // Verify input
-  if (blockAddress >= 4096)
-  {
-    printf("Attempted to erase invalid block %d", blockAddress);
-    return;
-  }
-
   FLASH_WriteEnable();
   FLASH_CS_Low();
   FLASH_Transmit(&ERASE_BLOCK, 1);
-  uint32_t pageAddress = blockAddress * 64; // Address of first page in block
-  FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
+  uint32_t pageAddress = blockAddress * 64;
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
   return FLASH_ReadRegister(3);
 }

@@ -44,6 +44,7 @@ static const uint8_t *REGISTERS[] = {
 
 // Timeout to use for all communications (in ms)
 #define COM_TIMEOUT 100
+#define MAX_CMD_LENGTH 64
 
 #endif /* FLASH_CONSTANTS_H */
 
@@ -109,10 +110,6 @@ void FLASH_RunCommand(char *cmdStr);
 void FLASH_ResetDeviceCmd(void);
 void FLASH_TestRegistersCmd(void);
 void FLASH_TestDataCmd(void);
-
-// // TODO: Combine the below?
-// int FLASH_TestReadWriteCmd(uint8_t testData[4], uint32_t testPageAddress);
-// int FLASH_TestEraseCmd(uint8_t testData[4], uint32_t testBlockAddress);
 // void FLASH_TestHeadTailCmd(void)
 
 #endif /* FLASH_H_ */

@@ -7,9 +7,7 @@
 
 #include "flash.h"
 
-//! Macros for CRC and compile-time constants
-// TODO: Move MAX_CMD_LENGTH to flash.h
-#define MAX_CMD_LENGTH 64
+//! Macros for CRC codes of different commands
 #define HELP_CMD 0x8875cac
 #define RESET_DEVICE_CMD 0xa730c915
 #define REGISTER_TEST_CMD 0x8f0add03
