@@ -1,232 +1,18 @@
-/*
- * test.c
- *
- *  Created on: Dec 16, 2024
- *      Author: niyaz
- */
-
 #include "flash.h"
 
-//! Macros for CRC and compile-time constants
-
-#define MAX_CMD_LENGTH 64
-#define HELP_CMD 0x8875cac
-#define RESET_DEVICE_CMD 0xa730c915
-#define REGISTER_TEST_CMD 0x8f0add03
-#define READ_WRITE_TEST_CMD 0x415ef1b4
-#define ERASE_TEST_CMD 0x5383f2ce
-#define CYCLE_TEST_CMD 0xf7bf70e
-#define HEAD_TAIL_TEST 0x84c67266
-
-// Implementation of CRC32b
-
-uint32_t crc32(const char *s, uint32_t n)
-{
-    uint32_t crc = 0xFFFFFFFF;
-
-    for (uint32_t i = 0; i < n; i++)
-    {
-        char ch = s[i];
-        for (uint32_t j = 0; j < 8; j++)
-        {
-            uint32_t b = (ch ^ crc) & 1;
-            crc >>= 1;
-            if (b)
-                crc = crc ^ 0xEDB88320;
-            ch >>= 1;
-        }
-    }
-
-    return ~crc;
-}
-
-//! Utility functions
-
-// Parses parameters into unsigned integers, clamping them into a given range. Invalid inputs are ignored.
-void parseParamAsInt(char *paramStr, uint32_t *paramPtr, uint32_t range[2])
-{
-    // Check if string exists
-    if (paramStr == NULL)
-    {
-        return;
-    }
-
-    // Parse using stroul, invalid conversions result in 0
-    char *endptr;
-    unsigned long result = strtoul(paramStr, &endptr, 10);
-
-    // Check for invalid input or out-of-range values
-    if (*endptr != '\0' || result >= UINT32_MAX)
-    {
-        printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", paramStr);
-        return;
-    }
-
-    uint32_t intResult = (uint32_t)result;
-    // Clamp into range
-    *paramPtr = (intResult >= range[0]) ? intResult : range[0]; // Clamp value to minimum
-    *paramPtr = (intResult <= range[1]) ? intResult : range[1]; // Clamp value to maximum
-}
-
-// Checks if a given string is all spaces
-bool isAllSpaces(char *str)
-{
-    // Iterate through each character in the string
-    while (*str != '\0')
-    {
-        if (*str != ' ')
-        {
-            return false;
-        }
-        str++;
-    }
-
-    return true;
-}
-
-//! Command functions
-volatile uint8_t receivedByte;
-volatile uint8_t cmdIndex = 0;
-volatile char cmdBuf[MAX_CMD_LENGTH];
-
-// UART receive callback function for interrupt-driven polling
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (receivedByte == 0x0D) // Enter
-    {
-        // Null terminate and send command to queue
-        cmdBuf[cmdIndex] = '\0';
-        osMessageQueuePut(uartQueueHandle, cmdBuf, 0, 0);
-        printf("\r\n");
-        // Reset input tracking to prep for next command input
-        cmdIndex = 0;
-    }
-    else if (receivedByte == 0x08) // Backspace
-    {
-        if (cmdIndex > 0)
-        {
-            printf("\b \b"); // Erase the last character on the terminal
-            cmdIndex--;
-        }
-        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
-    }
-    else
-    {
-        // Add character to buffer and print it
-        if (cmdIndex < MAX_CMD_LENGTH - 2)
-        {
-            cmdBuf[cmdIndex] = receivedByte;
-            printf("%c", (char)receivedByte);
-            cmdIndex++;
-        }
-        HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
-    }
-}
-
-// Begins listening for commands
-void FLASH_ListenCommands(void)
-{
-    printf("cmd: ");
-    HAL_UART_Receive_IT(&huart3, &receivedByte, 1); // Start receiving the first byte
-}
-
-// Parses and runs given command
-void FLASH_RunCommand(char *cmdStr)
-{
-    // Check if command is valid first
-    if (cmdStr == NULL || cmdStr[0] == '\0' || strlen(cmdStr) == 0 || isAllSpaces(cmdStr))
-    {
-        return;
-    }
-
-    // Parse the command into tokens
-    char *params[4]; // Max of 4 params
-    int paramCount = 0;
-    char *token, *cmd;
-    cmd = token = strtok(cmdStr, " "); // Get first token (command word)
-    while (token != NULL && paramCount < 4)
-    {
-        token = strtok(NULL, " ");
-        if (token != NULL)
-        {
-            params[paramCount] = token;
-            paramCount++;
-        }
-    }
-
-    // Parse and run each command
-    uint32_t cmdHash = crc32(cmd, strlen(cmd));
-    // osMessageQueueReset(cmdParamQueueHandle); // Clear any previous params
-    switch (cmdHash)
-    {
-    case HELP_CMD:
-        FLASH_GetHelpCmd();
-        break;
-    case RESET_DEVICE_CMD:
-        // Create a new thread to run the reset-device command
-        const osThreadAttr_t resetTaskAttr = {.priority = osPriorityHigh};
-        if (osThreadNew(FLASH_ResetDeviceCmd, NULL, &resetTaskAttr) == NULL)
-        {
-            printf("Failed to generate reset-device task\r\n");
-        }
-        break;
-    // case REGISTER_TEST_CMD:
-    //     FLASH_TestRegistersCmd();
-    //     break;
-    // case READ_WRITE_TEST_CMD:
-    //     uint32_t testPageAddress = 1;
-    //     if (tokenCount >= 2)
-    //     {
-    //         testPageAddress = parseParamAsInt(tokens[1], testPageAddress, 262143);
-    //     }
-    //     // Run the command
-    //     FLASH_TestReadWriteCmd(testData, testPageAddress);
-    //     break;
-    // case ERASE_TEST_CMD:
-    //     uint16_t testBlockAddress = 0;
-    //     if (tokenCount >= 2)
-    //     {
-    //         testBlockAddress = parseParamAsInt(tokens[1], testBlockAddress, 4094);
-    //     }
-    //     // Run the command
-    //     FLASH_TestEraseCmd(testData, testBlockAddress);
-    //     break;
-    case CYCLE_TEST_CMD:
-        // Parse given parameters
-        uint32_t cycleCount = 1, pageCount = 262144; // Params for the test
-        if (paramCount >= 1)
-        {
-            uint32_t cycleRange[] = {1, UINT32_MAX};
-            parseParamAsInt(params[0], &cycleCount, cycleRange);
-        }
-        if (paramCount >= 2)
-        {
-            uint32_t pageRange[] = {1, 262144};
-            parseParamAsInt(params[1], &pageCount, pageRange);
-        };
-
-        // Enqueue parameters (FIFO)
-        osMessageQueuePut(cmdParamQueueHandle, &cycleCount, 0, 0);
-        osMessageQueuePut(cmdParamQueueHandle, &pageCount, 0, 0);
-
-        // Create a new thread to run the cycle-test command
-        const osThreadAttr_t cycleTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
-        if (osThreadNew(FLASH_TestCycleCmd, NULL, &cycleTaskAttr) == NULL)
-        {
-            printf("Failed to generate cycle-test task\r\n");
-        }
-        break;
-    // case HEAD_TAIL_TEST:
-    //     FLASH_TestHeadTailCmd();
-    //     break;
-    default:
-        printf("Invalid Command\r\n");
-    }
-}
+//! Custom assert macro to handle errors
+#define ASSERT(condition, message)                                                                  \
+    do                                                                                              \
+    {                                                                                               \
+        if (!(condition))                                                                           \
+        {                                                                                           \
+            printf("\r\nTest Failed: %s (File: %s, Line: %d)\r\n", #condition, __FILE__, __LINE__); \
+            printf("[ERROR] %s\r\n", message);                                                      \
+        }                                                                                           \
+    } while (0)
 
 //! Functions that run each command
-
-// Print out man.txt to help users
+// Print list of commands
 void FLASH_GetHelpCmd(void)
 {
     printf("\r\nCOMMANDS\r\n");
@@ -236,146 +22,74 @@ void FLASH_GetHelpCmd(void)
     printf("Displays available commands and descriptions.\r\n\n");
 
     printf("reset-device\r\n");
-    printf("Resets the entire flash memory device.\r\n\n");
+    printf("Resets the entire W25N04KV flash memory device.\r\n\n");
 
     printf("register-test\r\n");
-    printf("Verifies the values of the memory status registers.\r\n\n");
+    printf("Verifies the values and functionality of the flash status registers.\r\n\n");
 
-    printf("read-write-test [testPageAddress]\r\n");
-    printf("Defaults: Page Address 0.\r\n");
-    printf("Performs read and write tests on the flash memory. Ensures buffer\r\n");
-    printf("reads and writes are working, and that data can be written to and\r\n");
-    printf("read from a page without modifying other pages\r\n\n");
+    // TODO: Change the below as required
+    printf("data-test [testPageAddress]\r\n");
+    printf("Performs tests to ensure buffer, reads, writes, and erases work properly.\r\n");
+    printf("Location of tests can be controlled via testPageAddress (page p).\r\n");
+    printf("Note that test involves writing and erasing of page p, p+1, and p+64 (next block).\r\n");
+    printf("Last block of a page will not be accepted as a valid input for testPageAddress.\r\n\n");
 
-    printf("erase-test [testBlockAddress]\r\n");
-    printf("Defaults: Block address 0.\r\n");
-    printf("Tests the erasure of data in flash memory. Block at testBlockAddress\r\n");
-    printf("and its subsequent block are filled with data, but only the test block\r\n");
-    printf("is erased. The data of both blocks is then checked.\r\n\n");
+    printf("head-tail-test\r\n");
+    printf("Ensures flash is able to correctly detect head and tail of circular data buffer.\r\n\n");
 
-    printf("cycle-test [cycleCount] [pageCount]\r\n");
-    printf("Defaults: 1 cycle, 262144 pages.\r\n");
-    printf("Performs repeated write-erase cycles for the first 'pageCount' pages.\r\n\n");
-
-    // TODO: Clean this up
-    printf("SYSTEM DETAILS\r\n");
+    // Print out status details about FreeRTOS
+    printf("FREERTOS DETAILS\r\n");
     printf("Stack Remaining for current task: %u bytes\r\n", uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t));
     printf("Free heap: %lu bytes\r\n\n", xPortGetFreeHeapSize());
 }
 
-// Individual thread which resets entire device
+// Sequentially erases all blocks
 void FLASH_ResetDeviceCmd(void)
 {
+    osDelay(10); // TODO: Check if buffer time before test begins is necessary
     printf("\r\nPerforming software and data reset...\r\n");
     FLASH_ResetDeviceSoftware();
     FLASH_EraseDevice();
     printf("Reset complete\r\n");
 
-    osThreadExit(); // Return to listenCommands thread
+    osThreadExit(); // Safely exit thread
 }
 
-// TODO: Fix hardfault issues
-// Perform sequence to perform "cycleCount" number of read-write cycles, testing the first "pageCount" pages
-void FLASH_TestCycleCmd()
+// Perform sequence to test registers
+void FLASH_TestRegistersCmd(void)
+{
+    // Check values of each register
+    osDelay(10); // TODO: Check if buffer time before test begins is necessary
+    ASSERT(FLASH_ReadRegister(1) == 0, "Unexpected protection register value, some memory blocks are still protected");
+    ASSERT(FLASH_ReadRegister(2) == 0x19, "Unexpected configuration register value, configurations are non-default");
+    ASSERT(FLASH_ReadRegister(3) == 0, "Unexpected status register value, possible write program or erase failure");
+
+    // Check if WEL bit can be set
+    FLASH_WriteEnable();
+    ASSERT(FLASH_ReadRegister(3) == 2, "Failed to set WEL bit in status register");
+
+    // Check if BUSY bit correctly sets during erase
+    int registerDuringErase = FLASH_EraseWithoutDelay(0);
+    printf("%u", registerDuringErase);
+    ASSERT(registerDuringErase == 3, "Failed to set BUSY bit in status register during erase operation");
+    osDelay(10); // Ensure erase properly terminates
+    ASSERT(FLASH_ReadRegister(3) == 0, "WEL and BUSY bits not cleared after erase operation");
+
+    printf("[PASSED] All registers configured correctly\r\n");
+    osThreadExit(); // Safely exit thread
+}
+
+// Performs sequence to test buffer, read, writes, and erase
+void FLASH_TestDataCmd(void)
 {
     // Fetch parameters from queue
-    uint8_t cycleCount; // Takes least significant byte
-    uint32_t pageCount;
-    osMessageQueueGet(cmdParamQueueHandle, &cycleCount, NULL, 0);
-    osMessageQueueGet(cmdParamQueueHandle, &pageCount, NULL, 0);
+    uint32_t testPageAddress;
+    osMessageQueueGet(cmdParamQueueHandle, &testPageAddress, NULL, 0);
 
-    // Calculate writes/erases per page
-    printf("\r\nTest write and erase for %u cycle(s), from page 0 to page %u\r\n", cycleCount, pageCount - 1);
+    // TODO: Perform the test
 
-    // Set some constants
-    uint8_t writtenData[2048] = {0}; // Array of all 0 to overwrite 0xFF
-    uint16_t sizeOfData = sizeof(writtenData) / sizeof(writtenData[0]);
-    uint8_t writesPerPage = 2048 / sizeOfData;
-    uint16_t eraseCount = ceil((double)pageCount / 64);
-
-    // Repeat cycles the required number of times
-    for (int c = 0; c < cycleCount; c++)
-    {
-        printf("\r\nCYCLE %u\r\n", c + 1);
-
-        // Write into pages required
-        printf("Performing writes...\r\n");
-        for (int p = 0; p < pageCount; p++)
-        {
-            // Write data to page in portions
-            for (int w = 0; w < writesPerPage; w++)
-            {
-                FLASH_WriteBuffer(writtenData, sizeOfData, w * sizeOfData);
-            }
-            FLASH_WriteExecute(p);
-        }
-        printf("Writes complete\r\n");
-
-        // Erase pages required
-        printf("Performing erases...\r\n");
-        for (int e = 0; e < eraseCount; e++)
-        {
-            FLASH_EraseBlock(e);
-        }
-        printf("Erases complete\r\n");
-    }
-
-    // TODO: Check if command name is correct, since read-write-test is changed
-    printf("\r\nCompleted all write-erase cycles, run \"read-write-test\" to check flash integrity\r\n\n");
     osThreadExit(); // Return to listenCommands thread
 }
-
-// // Perform sequence to test registers
-// int FLASH_TestRegistersCmd(void)
-// {
-//     uint8_t reg1 = FLASH_ReadRegister(1);
-//     uint8_t reg2 = FLASH_ReadRegister(2);
-//     uint8_t reg3 = FLASH_ReadRegister(3);
-
-//     // Check register 1
-//     printf("\r\nChecking register 1 (protection register), expecting 0x00 (All protections disabled)\r\n");
-//     printf("Register 1: 0x%02X\r\n", reg1);
-//     if (reg1 == 0)
-//     {
-//         printf("[PASSED] All protections are correctly disabled\r\n\n");
-//     }
-//     else
-//     {
-//         printf("[ERROR] Some memory blocks are still protected\r\n\n");
-//         return 0;
-//     }
-
-//     // Check register 2
-//     printf("Checking register 2 (configuration register), expecting 0x19 (Default configuration)\r\n");
-//     printf("Register 2: 0x%02X\r\n", reg2);
-//     if (reg2 == 0x19)
-//     {
-//         printf("[PASSED] Register 2 retains default configuration\r\n\n");
-//     }
-//     else
-//     {
-//         printf("[ERROR] Configurations have been modified\r\n\n");
-//         return 0;
-//     }
-
-//     // Check register 3
-//     printf("Checking register 3 (status register), expecting 0x00 (No failures or operations in progress)\r\n");
-//     printf("Register 3: 0x%02X\r\n", reg3);
-//     if (reg3 == 0)
-//     {
-//         printf("[PASSED] No failures detected; BUSY and WEL bits are clear as expected\r\n\n");
-//     }
-//     else
-//     {
-//         printf("[ERROR] Unexpected register value, possible program or erase failure\r\n");
-//         printf("[ERROR] Writes (WEL) may be enabled, or the program may be busy\r\n\n");
-//         return 0;
-//     }
-
-//     // Successfully checked all registers
-//     printf("All registers are correctly configured.\r\n\r\n");
-//     return 1;
-// }
 
 // // Perform sequence to test reads and writes
 // int FLASH_TestReadWriteCmd(uint32_t testPageAddress)

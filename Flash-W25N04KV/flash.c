@@ -118,7 +118,7 @@ void FLASH_AwaitNotBusy(void)
 {
   while (FLASH_IsBusy())
   {
-    HAL_Delay(1); // TODO: Short delays of 1ms, any better delay?
+    osDelay(1); // TODO: Short delays of 1ms, any better delay?
   }
 }
 
@@ -167,7 +167,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, others dummy)
   FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
   FLASH_CS_High();
-  HAL_Delay(1); // TODO: Should be 25 microseconds
+  osDelay(1); // TODO: Should be 25 microseconds
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
@@ -221,7 +221,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
   // Shift in 3-byte page address (last 18 bits used, others dummy)
   FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
   FLASH_CS_High();
-  HAL_Delay(1); // TODO: Should be 700 microseconds
+  osDelay(1); // TODO: Should be 700 microseconds
 }
 
 //! Erase Operations
@@ -239,8 +239,8 @@ void FLASH_EraseBuffer(void)
   FLASH_CS_High();
 }
 
-// Erase the block at the given block address (between 0 and 4095)
-void FLASH_EraseBlock(uint16_t blockAddress)
+// Erase the given block address without any delay, returning status register after
+int FLASH_EraseWithoutDelay(uint16_t blockAddress)
 {
   // Verify input
   if (blockAddress >= 4096)
@@ -250,15 +250,19 @@ void FLASH_EraseBlock(uint16_t blockAddress)
   }
 
   FLASH_WriteEnable();
-  FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&ERASE_BLOCK, 1);
-  // Shift in 3-byte page address (last 18 bits used, others dummy)
   uint32_t pageAddress = blockAddress * 64; // Address of first page in block
   FLASH_Transmit(((uint8_t *)&pageAddress) + 1, 3);
   FLASH_CS_High();
+  return FLASH_ReadRegister(3);
+}
 
-  HAL_Delay(10); // Maximum possible erase time
+// Erase the block at the given block address (between 0 and 4095)
+void FLASH_EraseBlock(uint16_t blockAddress)
+{
+  FLASH_EraseWithoutDelay(blockAddress);
+  osDelay(10); // TODO: Is this delay really needed since we check BUSY bit?
 }
 
 // Resets device software and disables write protection

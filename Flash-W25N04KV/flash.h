@@ -107,10 +107,10 @@ void FLASH_ListenCommands(void);
 void FLASH_RunCommand(char *cmdStr);
 // Testing functions
 void FLASH_ResetDeviceCmd(void);
-void FLASH_TestCycleCmd(void);
+void FLASH_TestRegistersCmd(void);
+void FLASH_TestDataCmd(void);
 
 // // TODO: Combine the below?
-// void FLASH_TestRegistersCmd(void);
 // int FLASH_TestReadWriteCmd(uint8_t testData[4], uint32_t testPageAddress);
 // int FLASH_TestEraseCmd(uint8_t testData[4], uint32_t testBlockAddress);
 // void FLASH_TestHeadTailCmd(void)
