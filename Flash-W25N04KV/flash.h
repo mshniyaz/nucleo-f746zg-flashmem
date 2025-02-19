@@ -44,6 +44,7 @@ static const uint8_t *REGISTERS[] = {
 
 // Timeout to use for all communications (in ms)
 #define COM_TIMEOUT 100
+#define MAX_CMD_LENGTH 64
 
 #endif /* FLASH_CONSTANTS_H */
 
@@ -78,6 +79,7 @@ union pageStructure
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart3;
 extern osMessageQueueId_t uartQueueHandle;
+extern osMessageQueueId_t cmdParamQueueHandle;
 
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
@@ -98,8 +100,16 @@ void FLASH_EraseBlock(uint16_t blockAddress);
 void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 
-// Testing Functions
+// Circular Buffer Functions
+void FLASH_FindHeadTail(circularBuffer *buf, uint8_t pageRange[2]);
+
+// CLI Listening Functions
 void FLASH_ListenCommands(void);
 void FLASH_RunCommand(char *cmdStr);
+// Testing functions
+void FLASH_ResetDeviceCmd(void);
+void FLASH_TestRegistersCmd(void);
+void FLASH_TestDataCmd(void);
+void FLASH_TestHeadTailCmd(void);
 
 #endif /* FLASH_H_ */

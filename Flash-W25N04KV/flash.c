@@ -1,10 +1,3 @@
-/*
- * flash.c
- *
- *  Created on: Dec 9, 2024
- *      Author: niyaz
- */
-
 #include "flash.h"
 
 //! General Operations
@@ -66,22 +59,6 @@ void FLASH_DummyClock(void)
   FLASH_Transmit(&dummy_byte, 1);
 }
 
-// Convenience functions for splitting uint32_t (little endian) into its 3 last bits only (from last memory address to first memory address)
-void uint32GetLastThreeBits(uint32_t n, uint8_t *threeLSB)
-{
-  for (int i = 0; i <= 2; i++)
-  {
-    threeLSB[2 - i] = *(((uint8_t *)&n) + i); // Note uint32_t is little endian
-  }
-}
-
-// Convert uint16_t to a big endian byte array
-void uint16ToByteArray(uint16_t n, uint8_t *byteArray)
-{
-  byteArray[0] = (n >> 8) & 0xFF;
-  byteArray[1] = n & 0xFF;
-}
-
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
@@ -124,10 +101,13 @@ bool FLASH_IsBusy(void)
 // Wait till BUSY bit is cleared to zero
 void FLASH_AwaitNotBusy(void)
 {
-  while (FLASH_IsBusy())
+  if (FLASH_IsBusy())
   {
-    HAL_Delay(1); //TODO: Short delays of 1ms, any better delay?
+    osDelay(1); // TODO: Check if there is any better delay
+    FLASH_AwaitNotBusy();
   }
+
+  return;
 }
 
 // Disable write protection for all blocks and registers
@@ -162,36 +142,33 @@ void FLASH_ReadJEDECID(void)
   printf("\r\n------------------------\r\n");
   printf("W25N04KV QspiNAND Memory\r\n");
   printf("JEDEC ID: 0x%02X 0x%02X 0x%02X",
-              jedecResponse[0], jedecResponse[1], jedecResponse[2]);
+         jedecResponse[0], jedecResponse[1], jedecResponse[2]);
   printf("\r\n------------------------\r\n");
 }
 
 // Transfers data in a page to the flash memory's data buffer
 void FLASH_ReadPage(uint32_t pageAddress)
 {
-  uint8_t truncatedPageAddress[3];
-  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
-
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&READ_PAGE, 1);
-  // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3);
+  // Shift in 3-byte page address (last 18 bits used, others dummy)
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
-  HAL_Delay(1); // TODO: Should be 25 microseconds
+  osDelay(1); // TODO: Should be 25 microseconds
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-  uint8_t columnAddressByteArray[2];
-  uint16ToByteArray(columnAddress, columnAddressByteArray);
+  uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF, columnAddress & 0xFF}; // Unpack into 2 bytes, ignore endianness
 
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&READ_BUFFER, 1);
   // Shift in 2-byte column address (only last 12 bits used)
-  FLASH_Transmit(columnAddressByteArray, 2);
+  FLASH_Transmit(columnAddressBytes, 2);
   FLASH_DummyClock();
   FLASH_Receive(readResponse, size);
   FLASH_CS_High();
@@ -210,15 +187,13 @@ void FLASH_WriteEnable(void)
 // Write to the flash memory's data buffer
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
-  uint8_t readResponse[size];
-  uint8_t columnAddressByteArray[2];
-  uint16ToByteArray(columnAddress, columnAddressByteArray);
+  uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF, columnAddress & 0xFF}; // Unpack into 2 bytes, ignore endianness
 
   FLASH_WriteEnable();
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_BUFFER, 1);
-  FLASH_Transmit(columnAddressByteArray, 2); // Shift in 2-byte column address (only last 12 bits used)
+  FLASH_Transmit(columnAddressBytes, 2); // Shift in 2-byte column address (only last 12 bits used)
   FLASH_Transmit(data, size);
   FLASH_CS_High();
 }
@@ -226,22 +201,21 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 // Write data in buffer to a page with a 3 byte address (Only up to end of page, extra data discarded)
 void FLASH_WriteExecute(uint32_t pageAddress)
 {
-  uint8_t truncatedPageAddress[3];
-  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
-
   FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&WRITE_EXECUTE, 1);
-  // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3);
+  // Shift in 3-byte page address (last 18 bits used, others dummy)
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
-  HAL_Delay(1); //TODO: Should be 700 microseconds
+  osDelay(1); // TODO: Should be 700 microseconds
 }
 
 //! Erase Operations
 
 // Erase the entire data buffer
-void FLASH_EraseBuffer(void) {
+void FLASH_EraseBuffer(void)
+{
   uint16_t columnAddress = 0;
 
   FLASH_WriteEnable();
@@ -252,28 +226,24 @@ void FLASH_EraseBuffer(void) {
   FLASH_CS_High();
 }
 
-// Erase the block at the given block address (between 0 and 4095)
-void FLASH_EraseBlock(uint16_t blockAddress)
-{ 
-  // Verify input
-  if (blockAddress >= 4096) {
-    printf("Attempted to erase invalid block %d", blockAddress);
-    return;
-  }
-
-  // FInd page address
-  uint32_t pageAddress = blockAddress * 64; // Address of first page in block
-  uint8_t truncatedPageAddress[3];
-  uint32GetLastThreeBits(pageAddress, truncatedPageAddress);
-
+// Erase the given block address without any delay, returning status register after
+int FLASH_EraseWithoutDelay(uint16_t blockAddress)
+{
   FLASH_WriteEnable();
-  FLASH_AwaitNotBusy();
   FLASH_CS_Low();
   FLASH_Transmit(&ERASE_BLOCK, 1);
-  // Shift in 3-byte page address (last 18 bits used, first 12 are block and last 6 are page address)
-  FLASH_Transmit(truncatedPageAddress, 3);
+  uint32_t pageAddress = blockAddress * 64;
+  uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF, pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
+  FLASH_Transmit(pageAddressBytes, 3);
   FLASH_CS_High();
-  HAL_Delay(10); // Maximum possible erase time
+  return FLASH_ReadRegister(3);
+}
+
+// Erase the block at the given block address (between 0 and 4095)
+void FLASH_EraseBlock(uint16_t blockAddress)
+{
+  FLASH_EraseWithoutDelay(blockAddress);
+  osDelay(10); // TODO: Is this delay really needed since we check BUSY bit?
 }
 
 // Resets device software and disables write protection
@@ -290,7 +260,7 @@ void FLASH_ResetDeviceSoftware(void)
 void FLASH_EraseDevice(void)
 {
   // There are 40 blocks
-  for (int i = 0; i < 4096; i ++)
+  for (int i = 0; i < 4096; i++)
   {
     FLASH_EraseBlock(i);
   }
@@ -298,4 +268,41 @@ void FLASH_EraseDevice(void)
   // Erase buffer and reset software
   FLASH_EraseBuffer();
   FLASH_ResetDeviceSoftware();
+}
+
+//! Circular Buffer Operations
+
+// Finds the head and tail of the flash and stores it into a circular buffer
+void FLASH_FindHeadTail(circularBuffer *buf, uint8_t pageRange[2])
+{
+  // Use entire range if not specified
+  if (pageRange == NULL)
+  {
+    pageRange[0] = 0;
+    pageRange[1] = 262144;
+  }
+
+  bool headFound = false;      // Tracks whether head has been found
+  union pageStructure pageBuf; // Buffer to store page data
+
+  for (int p = pageRange[0]; p < pageRange[1]; p++)
+  {
+    FLASH_ReadPage(p);
+    FLASH_ReadBuffer(0, 2048, pageBuf.bytes);
+
+    // Check dummy byte of every packet
+    for (int i = 0; i < 6; i++)
+    {
+      pkt packet = pageBuf.page.packetArray[i];
+      if (packet.dummy != 0xFF)
+      {
+        if (!headFound)
+        {
+          buf->head = p * 2048 + i * sizeof(pkt);
+          headFound = true;
+        }
+        buf->tail = p * 2048 + (i + 1) * sizeof(pkt);
+      }
+    }
+  }
 }
