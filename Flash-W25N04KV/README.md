@@ -1,6 +1,8 @@
 # Flash-W25N04KV Library Documentation
 
-The FLASH-W25N04KV library contains functions for operating the flash memory. Detailed documentation can be found in the FLASH-25N04KV folder. Include it in your code with the below:  
+The FLASH-W25N04KV library contains functions for operating the flash memory. Detailed documentation can be found in the FLASH-25N04KV folder. To ensure your project recognises the library, **Right click your project folder in STM32CubeIDE > Properties > C/C++ General > Paths and Symbols > Add "/${ProjName}/Flash-W25N04KV" as a workspace path**.
+
+Use the library with the below:
 
 ```c
 #include <flash.h>

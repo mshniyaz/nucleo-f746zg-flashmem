@@ -2,62 +2,62 @@
 
 //! General Operations
 
-// Drives Chip Select Low to issue a command
-void FLASH_CS_Low(void)
-{
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+// // Drives Chip Select Low to issue a command
+// void FLASH_CS_Low(void)
+// {
+//   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 
-  // Verify if the pin state is actually low
-  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_RESET)
-  {
-    printf("Error: Failed to flash chip select low\r\n");
-  }
-}
+//   // Verify if the pin state is actually low
+//   if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_RESET)
+//   {
+//     printf("Error: Failed to flash chip select low\r\n");
+//   }
+// }
 
-// Drives Chip Select High after issuing a command
-void FLASH_CS_High(void)
-{
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+// // Drives Chip Select High after issuing a command
+// void FLASH_CS_High(void)
+// {
+//   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 
-  // Verify if the pin state is actually low
-  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_SET)
-  {
-    printf("Error: Failed to flash chip select high\r\n");
-  }
-}
+//   // Verify if the pin state is actually low
+//   if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15) != GPIO_PIN_SET)
+//   {
+//     printf("Error: Failed to flash chip select high\r\n");
+//   }
+// }
 
-// Transmits 1 or more bytes of data from master to slave via SPI
-void FLASH_Transmit(uint8_t *data, uint16_t size)
-{
-  if (HAL_SPI_Transmit(&hspi1, data, size, COM_TIMEOUT) != HAL_OK)
-  {
-    printf("SPI transmit failed\r\n");
-    FLASH_CS_High();
-    return;
-  }
-}
+// // Transmits 1 or more bytes of data from master to slave via SPI
+// void FLASH_Transmit(uint8_t *data, uint16_t size)
+// {
+//   if (HAL_SPI_Transmit(&hspi1, data, size, COM_TIMEOUT) != HAL_OK)
+//   {
+//     printf("SPI transmit failed\r\n");
+//     FLASH_CS_High();
+//     return;
+//   }
+// }
 
-// Receive output from the slave (flash memory) via SPI
-void FLASH_Receive(uint8_t *buf, uint16_t size)
-{
-  uint8_t response[size];
-  if (HAL_SPI_Receive(&hspi1, response, size, COM_TIMEOUT) != HAL_OK)
-  {
-    printf("SPI receive failed \r\n");
-    FLASH_CS_High();
-    return;
-  }
+// // Receive output from the slave (flash memory) via SPI
+// void FLASH_Receive(uint8_t *buf, uint16_t size)
+// {
+//   uint8_t response[size];
+//   if (HAL_SPI_Receive(&hspi1, response, size, COM_TIMEOUT) != HAL_OK)
+//   {
+//     printf("SPI receive failed \r\n");
+//     FLASH_CS_High();
+//     return;
+//   }
 
-  // Copy received data to the output buffer
-  memcpy(buf, response, size);
-}
+//   // Copy received data to the output buffer
+//   memcpy(buf, response, size);
+// }
 
-// Generates a cycle of 8 dummy clocks by transmitting 0x00
-void FLASH_DummyClock(void)
-{
-  uint8_t dummy_byte = 0x00;
-  FLASH_Transmit(&dummy_byte, 1);
-}
+// // Generates a cycle of 8 dummy clocks by transmitting 0x00
+// void FLASH_DummyClock(void)
+// {
+//   uint8_t dummy_byte = 0x00;
+//   FLASH_Transmit(&dummy_byte, 1);
+// }
 
 //! Managing Status Registers
 
@@ -129,14 +129,28 @@ void FLASH_ReadJEDECID(void)
 {
   uint8_t jedecResponse[3] = {0}; // Set to 0 by default, will be overridden later
 
-  // Send JEDEC ID opcode
-  FLASH_CS_Low();
-  FLASH_Transmit(&GET_JEDEC, 1);
-  FLASH_DummyClock();
+  QSPI_CommandTypeDef sCommand = {0};
+  sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE;
+  sCommand.Instruction = GET_JEDEC;
+  sCommand.AddressMode = QSPI_ADDRESS_NONE;
+  sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
+  sCommand.DataMode = QSPI_DATA_1_LINE;
+  sCommand.DummyCycles = 8;
+  sCommand.NbData = 3;
+
+  // Send JEDEC ID opcode and dummy cycles
+  if (HAL_QSPI_Command(&hqspi, &sCommand, COM_TIMEOUT) != HAL_OK)
+  {
+    printf("Error: Failed to send JEDEC ID command\r\n");
+    return;
+  }
 
   // Receive 3 bytes (JEDEC ID)
-  FLASH_Receive(jedecResponse, 3);
-  FLASH_CS_High();
+  if (HAL_QSPI_Receive(&hqspi, jedecResponse, COM_TIMEOUT) != HAL_OK)
+  {
+    printf("Error: Failed to receive JEDEC ID\r\n");
+    return;
+  }
 
   // Print JEDEC ID to UART
   printf("\r\n------------------------\r\n");

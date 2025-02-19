@@ -10,6 +10,7 @@
 
 #include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_uart.h"
+#include "stm32f7xx_hal_qspi.h"
 #include "cmsis_os.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -75,8 +76,8 @@ union pageStructure
     uint8_t bytes[sizeof(pageRead)]; // Contains raw page data (for portability)
 };
 
-// SPI, UART, and queue handling types, must be defined in main.c
-extern SPI_HandleTypeDef hspi1;
+// QSPI, UART, and queue handling types, must be defined in main.c
+extern QSPI_HandleTypeDef hqspi;
 extern UART_HandleTypeDef huart3;
 extern osMessageQueueId_t uartQueueHandle;
 extern osMessageQueueId_t cmdParamQueueHandle;
