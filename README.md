@@ -12,9 +12,9 @@ Meant for use with the STM32CubeIDE 1.17.0, installed from [this link](https://w
 
 ## `.ioc` Configuration
 
-<Insert .ioc file image here>
+![](https://github.com/user-attachments/assets/428bf828-9ed9-429b-8cf4-32e1527f9b25)
 
-The `.ioc` file must be configured correctly based on the board being used. The `.ioc` file included is preconfigured for the Nucleo F746ZG.
+The `.ioc` file must be configured correctly based on the board being used. The `.ioc` file included is preconfigured for the Nucleo F746ZG. Pinouts can be changed in the Pinout & Configuration tab, with peripheral config on the left.
 
 ### Baud Rate
 
