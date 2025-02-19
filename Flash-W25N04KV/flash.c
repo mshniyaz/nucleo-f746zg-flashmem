@@ -273,21 +273,27 @@ void FLASH_EraseDevice(void)
 //! Circular Buffer Operations
 
 // Finds the head and tail of the flash and stores it into a circular buffer
-void FLASH_FindHeadTail(circularBuffer *buf)
+void FLASH_FindHeadTail(circularBuffer *buf, uint8_t pageRange[2])
 {
-  bool headFound = false;      // Tracks whether the head has been found
-  union pageStructure pageBuf; // Buffer to store the page data
+  // Use entire range if not specified
+  if (pageRange == NULL)
+  {
+    pageRange[0] = 0;
+    pageRange[1] = 262144;
+  }
 
-  for (int p = 0; p < 3; p++)
+  bool headFound = false;      // Tracks whether head has been found
+  union pageStructure pageBuf; // Buffer to store page data
+
+  for (int p = pageRange[0]; p < pageRange[1]; p++)
   {
     FLASH_ReadPage(p);
     FLASH_ReadBuffer(0, 2048, pageBuf.bytes);
 
-    // Check first byte of every packet
+    // Check dummy byte of every packet
     for (int i = 0; i < 6; i++)
     {
       pkt packet = pageBuf.page.packetArray[i];
-      // printf("\r\n%u, %u, %x\r\n", p, i, packet.dummy);
       if (packet.dummy != 0xFF)
       {
         if (!headFound)

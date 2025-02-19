@@ -12,6 +12,8 @@ Meant for use with the STM32CubeIDE 1.17.0, installed from [this link](https://w
 
 ## `.ioc` Configuration
 
+<Insert .ioc file image here>
+
 The `.ioc` file must be configured correctly based on the board being used. The `.ioc` file included is preconfigured for the Nucleo F746ZG.
 
 ### Baud Rate
@@ -20,10 +22,11 @@ The baud rate has been set to 9 Mbits/s to facilitate fast writing and erasing o
 
 ### FreeRTOS
 
-FreeRTOS has been enabled with a single task, `ListenCommands`, running at the lowest priority. This task constantly listens for input from a CLI transmitted to the MCU via UART.
+FreeRTOS has been enabled with a single task, `ListenCommands`, running at the lowest priority. This interrupt-driven task implements a CLI which listens to user input of commands.
 
 - The task is assigned a stack size of 2048 (A lower stack size may cause a HardFault), which can be adjusted under **Middleware > FreeRTOS > Tasks & Queues > ListenCommands**.
 - FreeRTOS uses SYSTICK, and hence a different timer, `TIM6` is used for HAL. The timer used for HAL can be changed under **System Core > SYS > Timebase Source**.
+- The `ListenCommands` task may create other tasks for individual commands. To prevent hardfault, the total FreeRTOS heap size for all tasks has been increased to 65536 bytes under **Middleware > FreeRTOS > Config Params > TOTAL_HEAP_SIZE**
 
 ### Pinout Configuration
 
@@ -60,11 +63,3 @@ The FLASH-W25N04KV library contains functions for operating the flash memory. De
 ```c
 #include <flash.h>
 ```
-
-## Additional Notes
-
-The circular buffer has not yet been implemented. Notable potential issues include:
-
-1. When writing to the data buffer, data exceeding the buffer size is ignored. Dummy bytes must be left at the end of pages to prevent packet splitting between pages.
-2. Since ECC is disabled, the data buffer may have additional bytes (up to 2176 from 2048). If additional bytes are available, `FLASH_TestCycle` (in `test.c`) must be updated appropriately.
-3. Page Read/Write and Buffer Read/Write have HAL_Delays of 1ms after execution of the command.

@@ -192,9 +192,14 @@ void FLASH_RunCommand(char *cmdStr)
             printf("Failed to generate data-test task\r\n");
         }
         break;
-    // case HEAD_TAIL_TEST:
-    //     FLASH_TestHeadTailCmd();
-    //     break;
+    case HEAD_TAIL_TEST:
+        // Craete a new thread to run the head-tail-test command
+        const osThreadAttr_t headTailTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
+        if (osThreadNew(FLASH_TestHeadTailCmd, NULL, &headTailTaskAttr) == NULL)
+        {
+            printf("Failed to generate head-tail-test task\r\n");
+        }
+        break;
     default:
         printf("Invalid Command \"%s\" (CRC32: 0x%x)\r\n", cmdStr, cmdHash);
     }

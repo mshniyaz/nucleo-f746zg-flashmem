@@ -101,7 +101,7 @@ void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 
 // Circular Buffer Functions
-void FLASH_FindHeadTail(circularBuffer *buf);
+void FLASH_FindHeadTail(circularBuffer *buf, uint8_t pageRange[2]);
 
 // CLI Listening Functions
 void FLASH_ListenCommands(void);
@@ -110,6 +110,6 @@ void FLASH_RunCommand(char *cmdStr);
 void FLASH_ResetDeviceCmd(void);
 void FLASH_TestRegistersCmd(void);
 void FLASH_TestDataCmd(void);
-// void FLASH_TestHeadTailCmd(void)
+void FLASH_TestHeadTailCmd(void);
 
 #endif /* FLASH_H_ */
