@@ -9,18 +9,18 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
 
     sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE; // Set instruction (opcode)
     sCommand.Instruction = instruction->opCode;
-    sCommand.AddressMode = (instruction->addressSize > 0 && instruction->address != NULL)
-                               ? QSPI_ADDRESS_1_LINE
-                               : QSPI_ADDRESS_NONE; // Set address mode and size
+    sCommand.AddressMode =
+        (instruction->addressSize > 0) ? QSPI_ADDRESS_1_LINE : QSPI_ADDRESS_NONE; // Set address mode and size
     sCommand.AddressSize = (instruction->addressSize == 1)   ? QSPI_ADDRESS_8_BITS
                            : (instruction->addressSize == 2) ? QSPI_ADDRESS_16_BITS
                            : (instruction->addressSize == 3) ? QSPI_ADDRESS_24_BITS
+                           : (instruction->addressSize == 4) ? QSPI_ADDRESS_32_BITS
                                                              : QSPI_ADDRESS_NONE;
-    sCommand.Address =
-        (instruction->address != NULL) ? (uint32_t)instruction->address : QSPI_ADDRESS_NONE; // Add address field
-    sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE; // Alternate bytes (not used)
-    sCommand.DummyCycles = instruction->dummyClocks;        // Dummy cycles
-    sCommand.DataMode = (instruction->linesUsed == 1)   ? QSPI_DATA_1_LINE
+    sCommand.Address = (instruction->addressSize > 0) ? instruction->address : 0; // Pass in address if provided
+    sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;                       // Alternate bytes (not used)
+    sCommand.DummyCycles = (instruction->dummyClocks != NULL) ? instruction->dummyClocks : 0; // Dummy cycles
+    sCommand.DataMode = (instruction->dataMode == NULL) ? QSPI_DATA_NONE
+                        : (instruction->linesUsed == 1) ? QSPI_DATA_1_LINE
                         : (instruction->linesUsed == 2) ? QSPI_DATA_2_LINES
                         : (instruction->linesUsed == 4) ? QSPI_DATA_4_LINES
                                                         : QSPI_DATA_NONE; // Set data mode (1, 2, or 4 lines)
@@ -49,43 +49,74 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
     return 0; // Instruction successful
 }
 
+// Wrapper for all addresses (to ensure big-endian across all architectures)
+// uint32_t addressWrapper(uint32_t address)
+// {
+//     // Break into byte array
+//     uint8_t byteArray[4];
+//     byteArray[0] = (address >> 24) & 0xFF;
+//     byteArray[1] = (address >> 16) & 0xFF;
+//     byteArray[2] = (address >> 8) & 0xFF;
+//     byteArray[3] = address & 0xFF;
+
+//     // Reconstruct into address
+//     uint32_t newAddress = (byteArray[0] << 24) | (byteArray[1] << 16) | (byteArray[2] << 8) | byteArray[3];
+//     return newAddress;
+// }
+
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
 uint8_t FLASH_ReadRegister(int registerNo)
 {
-    uint8_t registerResponse[1];
+    uint8_t registerResponse;
+    FlashInstruction readRegister = {.opCode = READ_REGISTER,
+                                     .address = REGISTERS[registerNo - 1],
+                                     .addressSize = 1,
+                                     .dataMode = RECEIVE,
+                                     .dataBuf = &registerResponse,
+                                     .dataSize = 1,
+                                     .linesUsed = 1};
 
-    // Carry out the read instruction
-    FLASH_CS_Low();
-    FLASH_Transmit(&READ_REGISTER, 1);
-    if (registerNo >= 1 && registerNo <= 3)
+    if (FLASH_QSPIInstruction(&readRegister) != 0)
     {
-        FLASH_Transmit(REGISTERS[registerNo - 1], 1);
+        printf("Error: Failed to read register %u\r\n", registerNo);
+        return;
     }
-    else
+
+    return registerResponse;
+}
+
+// Disable write protection for all blocks and registers
+void FLASH_DisableWriteProtect(void)
+{
+    uint8_t registerVal = 0x00; // Set all bits of register 1 to 0
+    FlashInstruction disableWriteProtect = {.opCode = WRITE_REGISTER,
+                                            .address = REGISTER_ONE,
+                                            .addressSize = 1,
+                                            .dataMode = TRANSMIT,
+                                            .dataBuf = &registerVal,
+                                            .dataSize = 1,
+                                            .linesUsed = 1};
+
+    if (FLASH_QSPIInstruction(&disableWriteProtect) != 0)
     {
-        FLASH_Transmit(REGISTERS[2], 1); // Get status register by deafult
+        printf("Error: Failed to disable write protection\r\n");
     }
-    FLASH_Receive(registerResponse, 1);
-    FLASH_CS_High();
-    return registerResponse[0];
 }
 
 // Read Write Enable Latch (WEL) Bit
 bool FLASH_IsWEL(void)
 {
     uint8_t statusRegister = FLASH_ReadRegister(3);
-    bool isWriteEnabled = (statusRegister & (1 << 1)) >> 1; // WEL is 2nd last bit
-    return isWriteEnabled;
+    return (statusRegister & (1 << 1)) >> 1; // WEL is 2nd last bit
 }
 
 // Read BUSY Bit
 bool FLASH_IsBusy(void)
 {
     uint8_t statusRegister = FLASH_ReadRegister(3);
-    bool isBusy = statusRegister & 1; // Busy bit is last bit
-    return isBusy;
+    return statusRegister & 1; // Busy bit is last bit
 }
 
 // Wait till BUSY bit is cleared to zero
@@ -100,33 +131,21 @@ void FLASH_AwaitNotBusy(void)
     return;
 }
 
-// Disable write protection for all blocks and registers
-void FLASH_DisableWriteProtect(void)
-{
-    uint8_t newRegValue = 0x00; // Set all bits to zero
-
-    FLASH_CS_Low();
-    FLASH_Transmit(&WRITE_REGISTER, 1);
-    FLASH_Transmit(REGISTERS[0], 1);
-    FLASH_Transmit(&newRegValue, 1);
-    FLASH_CS_High();
-}
-
 //! Read Operations
 
 // Read JEDEC ID of flash memory
 void FLASH_ReadJEDECID(void)
 {
     uint8_t jedecResponse[3] = {0}; // Buffer to hold 3 byte ID (0xEFAA23)
-    FlashInstruction jedecInstruction = {.opCode = GET_JEDEC,
-                                         .address = NULL,
-                                         .dummyClocks = 8,
-                                         .dataMode = RECEIVE,
-                                         .dataBuf = jedecResponse,
-                                         .dataSize = 3,
-                                         .linesUsed = 1};
+    FlashInstruction readJEDEC = {.opCode = GET_JEDEC,
+                                  .address = NULL,
+                                  .dummyClocks = 8,
+                                  .dataMode = RECEIVE,
+                                  .dataBuf = jedecResponse,
+                                  .dataSize = 3,
+                                  .linesUsed = 1};
 
-    if (FLASH_QSPIInstruction(&jedecInstruction) != 0)
+    if (FLASH_QSPIInstruction(&readJEDEC) != 0)
     {
         printf("Error: Failed to send JEDEC ID command\r\n");
         return;
@@ -142,31 +161,32 @@ void FLASH_ReadJEDECID(void)
 // Transfers data in a page to the flash memory's data buffer
 void FLASH_ReadPage(uint32_t pageAddress)
 {
+    FlashInstruction readPage = {.opCode = READ_PAGE, .address = pageAddress, .addressSize = 3};
+
     FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&READ_PAGE, 1);
-    // Shift in 3-byte page address (last 18 bits used, others dummy)
-    uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF,
-                                   pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
-    FLASH_Transmit(pageAddressBytes, 3);
-    FLASH_CS_High();
+    if (FLASH_QSPIInstruction(&readPage) != 0)
+    {
+        printf("Error: Failed to read page %u\r\n", pageAddress);
+    }
     osDelay(1); // TODO: Should be 25 microseconds
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-    uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF,
-                                     columnAddress & 0xFF}; // Unpack into 2 bytes, ignore endianness
+    FlashInstruction readBuffer = {.opCode = READ_BUFFER,
+                                   .address = columnAddress,
+                                   .addressSize = 2,
+                                   .dummyClocks = 8,
+                                   .dataMode = RECEIVE,
+                                   .dataBuf = readResponse,
+                                   .dataSize = size,
+                                   .linesUsed = 1};
 
-    FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&READ_BUFFER, 1);
-    // Shift in 2-byte column address (only last 12 bits used)
-    FLASH_Transmit(columnAddressBytes, 2);
-    FLASH_DummyClock();
-    FLASH_Receive(readResponse, size);
-    FLASH_CS_High();
+    if (FLASH_QSPIInstruction(&readBuffer) != 0)
+    {
+        printf("Error: Failed to read data buffer\r\n");
+    }
 }
 
 //! Write Operations

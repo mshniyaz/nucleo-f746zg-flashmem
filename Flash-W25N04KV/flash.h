@@ -19,23 +19,23 @@
 #include <string.h>
 
 // Instruction Set Constants
-static const uint8_t RESET_DEVICE = 0xFF;
+#define READ_REGISTER 0x0F
 #define GET_JEDEC 0x9F
-static const uint8_t READ_REGISTER = 0x0F;
-static const uint8_t WRITE_REGISTER = 0x01;
-static const uint8_t READ_PAGE = 0x13;
-static const uint8_t READ_BUFFER = 0x03;
+#define WRITE_REGISTER 0x01
+#define READ_PAGE 0x13
+#define READ_BUFFER 0x03
 static const uint8_t WRITE_ENABLE = 0x06;
 static const uint8_t WRITE_BUFFER = 0x84;
 static const uint8_t WRITE_BUFFER_WITH_RESET = 0x02;
 static const uint8_t WRITE_EXECUTE = 0x10;
 static const uint8_t ERASE_BLOCK = 0xD8;
+static const uint8_t RESET_DEVICE = 0xFF;
 
 // Addresses of 3 status registers
-static const uint8_t REGISTER_ONE = 0xA0;
-static const uint8_t REGISTER_TWO = 0xB0;
-static const uint8_t REGISTER_THREE = 0xC0;
-static const uint8_t *REGISTERS[] = {&REGISTER_ONE, &REGISTER_TWO, &REGISTER_THREE};
+#define REGISTER_ONE 0xA0
+#define REGISTER_TWO 0xB0
+#define REGISTER_THREE 0xC0
+static const uint8_t REGISTERS[] = {REGISTER_ONE, REGISTER_TWO, REGISTER_THREE};
 
 // Timeout to use for all communications (in ms)
 #define COM_TIMEOUT 100
@@ -44,16 +44,17 @@ static const uint8_t *REGISTERS[] = {&REGISTER_ONE, &REGISTER_TWO, &REGISTER_THR
 // Macros to use when selecting transmit or receive in instruction
 #define TRANSMIT 0
 #define RECEIVE 1
+// Macro redefining address none as page 0 can be written to
+#define ADDRESS_NONE 0xFFFFFFFF
 
 // Struct to issue instructions
 typedef struct
 {
     uint8_t opCode;       // Single byte operation code
-    uint8_t *address;     // Byte array of address (up to 3 bytes)
+    uint32_t address;     // Address to be sent
     uint16_t addressSize; // Size of address in bytes (2-3)
     uint8_t dummyClocks;  // Number of dummy clock cycles to send
-    uint8_t dataMode;     // TRANSMIT or RECEIVE macros to determine whether to
-                          // trasmit or receive data
+    uint8_t dataMode;     // TRANSMIT or RECEIVE macros to determine whether to trasmit or receive data
     uint8_t *dataBuf;     // Buffer to store data to trasmit/hold received data
     uint16_t dataSize;    // Size of data in bytes
     uint8_t linesUsed;    // Number of QSPI lines used for transmit/receive
@@ -93,6 +94,7 @@ extern osMessageQueueId_t uartQueueHandle;
 extern osMessageQueueId_t cmdParamQueueHandle;
 
 //! Memory management functions
+// uint32_t addressWrapper(uint32_t address);
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
 
