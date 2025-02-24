@@ -24,12 +24,13 @@
 #define WRITE_REGISTER 0x01
 #define READ_PAGE 0x13
 #define READ_BUFFER 0x03
-static const uint8_t WRITE_ENABLE = 0x06;
-static const uint8_t WRITE_BUFFER = 0x84;
-static const uint8_t WRITE_BUFFER_WITH_RESET = 0x02;
-static const uint8_t WRITE_EXECUTE = 0x10;
-static const uint8_t ERASE_BLOCK = 0xD8;
-static const uint8_t RESET_DEVICE = 0xFF;
+#define WRITE_ENABLE 0x06
+#define WRITE_DISABLE 0x04
+#define WRITE_BUFFER 0x84
+#define WRITE_BUFFER_WITH_RESET 0x02
+#define WRITE_EXECUTE 0x10
+#define ERASE_BLOCK 0xD8
+#define RESET_DEVICE 0xFF
 
 // Addresses of 3 status registers
 #define REGISTER_ONE 0xA0
@@ -42,8 +43,8 @@ static const uint8_t REGISTERS[] = {REGISTER_ONE, REGISTER_TWO, REGISTER_THREE};
 // Maximum command length for CLI
 #define MAX_CMD_LENGTH 64
 // Macros to use when selecting transmit or receive in instruction
-#define TRANSMIT 0
-#define RECEIVE 1
+#define TRANSMIT 1
+#define RECEIVE 2
 // Macro redefining address none as page 0 can be written to
 #define ADDRESS_NONE 0xFFFFFFFF
 
@@ -94,9 +95,13 @@ extern osMessageQueueId_t uartQueueHandle;
 extern osMessageQueueId_t cmdParamQueueHandle;
 
 //! Memory management functions
-// uint32_t addressWrapper(uint32_t address);
+// General QSPI Instructions
+int FLASH_QSPIInstruction(FlashInstruction *instruction);
+
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
+bool FLASH_IsWEL(void);
+bool FLASH_IsBusy(void);
 
 // Read functions
 void FLASH_ReadJEDECID(void);

@@ -113,9 +113,6 @@ int main(void)
     MX_USB_OTG_FS_PCD_Init();
     MX_QUADSPI_Init();
     /* USER CODE BEGIN 2 */
-    HAL_Delay(1000);
-    FLASH_ReadJEDECID();
-    // FLASH_ResetDeviceSoftware();
     /* USER CODE END 2 */
 
     /* Init scheduler */
@@ -470,24 +467,24 @@ PUTCHAR_PROTOTYPE
 void listenCommands(void *argument)
 {
     /* USER CODE BEGIN 5 */
-    // char receivedCommand[64]; // Buffer to track received command
-    // FLASH_ListenCommands();   // Begin listening for user input
+    // Quick restart for the flash
+    HAL_Delay(1000);
+    FLASH_ReadJEDECID();
+    FLASH_ResetDeviceSoftware();
 
-    //! Test code here
-    uint8_t readResponse[4] = {0};
+    // Begin listening for user input
+    char receivedCommand[64]; // Buffer to track received command
+    FLASH_ListenCommands();
 
     /* Infinite loop */
     for (;;)
     {
-        // Wait indefinitely for a full command
-        // if (osMessageQueueGet(uartQueueHandle, receivedCommand, NULL, osWaitForever) == osOK)
-        // {
-        //     // TODO: Reenable the below once FLASH_RunCommand is implemented
-        //     FLASH_RunCommand(receivedCommand);
-        //     FLASH_ListenCommands(); // Restart listening for next command
-        // }
-
-        //! Test code here
+        // Wait for command to be shifted into queue
+        if (osMessageQueueGet(uartQueueHandle, receivedCommand, NULL, osWaitForever) == osOK)
+        {
+            FLASH_RunCommand(receivedCommand);
+            FLASH_ListenCommands(); // Restart listening for next command
+        }
     }
 
     // In case we accidentally exit from task loop
@@ -496,7 +493,6 @@ void listenCommands(void *argument)
 }
 
 /**
- * @brief  Period elapsed callback in non blocking mode
  * @note   This function is called  when TIM6 interrupt took place, inside
  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
  * a global variable "uwTick" used as application time base.

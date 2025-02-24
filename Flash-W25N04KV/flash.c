@@ -35,14 +35,21 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
     // Transmit only if data is provided
     if (instruction->dataBuf != NULL && instruction->dataSize > 0)
     {
-        if (instruction->dataMode == TRANSMIT && HAL_QSPI_Transmit(&hqspi, instruction->dataBuf, COM_TIMEOUT) != HAL_OK)
+        // Handle transmits
+        if (instruction->dataMode == TRANSMIT)
         {
-            return 1; // Transmission failed
+            if (HAL_QSPI_Transmit(&hqspi, instruction->dataBuf, COM_TIMEOUT) != HAL_OK)
+            {
+                return 1; // Transmission failed
+            }
         }
-        else if (instruction->dataMode == RECEIVE &&
-                 HAL_QSPI_Receive(&hqspi, instruction->dataBuf, COM_TIMEOUT) != HAL_OK)
+        // Handle receives
+        else if (instruction->dataMode == RECEIVE)
         {
-            return 1; // Reception failed
+            if (HAL_QSPI_Receive(&hqspi, instruction->dataBuf, COM_TIMEOUT) != HAL_OK)
+            {
+                return 1; // Reception failed
+            }
         }
     }
 
@@ -70,13 +77,15 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
 uint8_t FLASH_ReadRegister(int registerNo)
 {
     uint8_t registerResponse;
-    FlashInstruction readRegister = {.opCode = READ_REGISTER,
-                                     .address = REGISTERS[registerNo - 1],
-                                     .addressSize = 1,
-                                     .dataMode = RECEIVE,
-                                     .dataBuf = &registerResponse,
-                                     .dataSize = 1,
-                                     .linesUsed = 1};
+    FlashInstruction readRegister = {
+        .opCode = READ_REGISTER,
+        .address = REGISTERS[registerNo - 1],
+        .addressSize = 1,
+        .dataMode = RECEIVE,
+        .dataBuf = &registerResponse,
+        .dataSize = 1,
+        .linesUsed = 1,
+    };
 
     if (FLASH_QSPIInstruction(&readRegister) != 0)
     {
@@ -91,13 +100,15 @@ uint8_t FLASH_ReadRegister(int registerNo)
 void FLASH_DisableWriteProtect(void)
 {
     uint8_t registerVal = 0x00; // Set all bits of register 1 to 0
-    FlashInstruction disableWriteProtect = {.opCode = WRITE_REGISTER,
-                                            .address = REGISTER_ONE,
-                                            .addressSize = 1,
-                                            .dataMode = TRANSMIT,
-                                            .dataBuf = &registerVal,
-                                            .dataSize = 1,
-                                            .linesUsed = 1};
+    FlashInstruction disableWriteProtect = {
+        .opCode = WRITE_REGISTER,
+        .address = REGISTER_ONE,
+        .addressSize = 1,
+        .dataMode = TRANSMIT,
+        .dataBuf = &registerVal,
+        .dataSize = 1,
+        .linesUsed = 1,
+    };
 
     if (FLASH_QSPIInstruction(&disableWriteProtect) != 0)
     {
@@ -127,8 +138,6 @@ void FLASH_AwaitNotBusy(void)
         osDelay(1); // TODO: Check if there is any better delay
         FLASH_AwaitNotBusy();
     }
-
-    return;
 }
 
 //! Read Operations
@@ -137,13 +146,15 @@ void FLASH_AwaitNotBusy(void)
 void FLASH_ReadJEDECID(void)
 {
     uint8_t jedecResponse[3] = {0}; // Buffer to hold 3 byte ID (0xEFAA23)
-    FlashInstruction readJEDEC = {.opCode = GET_JEDEC,
-                                  .address = NULL,
-                                  .dummyClocks = 8,
-                                  .dataMode = RECEIVE,
-                                  .dataBuf = jedecResponse,
-                                  .dataSize = 3,
-                                  .linesUsed = 1};
+    FlashInstruction readJEDEC = {
+        .opCode = GET_JEDEC,
+        .address = NULL,
+        .dummyClocks = 8,
+        .dataMode = RECEIVE,
+        .dataBuf = jedecResponse,
+        .dataSize = 3,
+        .linesUsed = 1,
+    };
 
     if (FLASH_QSPIInstruction(&readJEDEC) != 0)
     {
@@ -161,7 +172,11 @@ void FLASH_ReadJEDECID(void)
 // Transfers data in a page to the flash memory's data buffer
 void FLASH_ReadPage(uint32_t pageAddress)
 {
-    FlashInstruction readPage = {.opCode = READ_PAGE, .address = pageAddress, .addressSize = 3};
+    FlashInstruction readPage = {
+        .opCode = READ_PAGE,
+        .address = pageAddress,
+        .addressSize = 3,
+    };
 
     FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruction(&readPage) != 0)
@@ -174,14 +189,16 @@ void FLASH_ReadPage(uint32_t pageAddress)
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-    FlashInstruction readBuffer = {.opCode = READ_BUFFER,
-                                   .address = columnAddress,
-                                   .addressSize = 2,
-                                   .dummyClocks = 8,
-                                   .dataMode = RECEIVE,
-                                   .dataBuf = readResponse,
-                                   .dataSize = size,
-                                   .linesUsed = 1};
+    FlashInstruction readBuffer = {
+        .opCode = READ_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dummyClocks = 8,
+        .dataMode = RECEIVE,
+        .dataBuf = readResponse,
+        .dataSize = size,
+        .linesUsed = 1,
+    };
 
     if (FLASH_QSPIInstruction(&readBuffer) != 0)
     {
@@ -194,37 +211,60 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
 // Enable write operations to the flash memory
 void FLASH_WriteEnable(void)
 {
-    FLASH_CS_Low();
-    FLASH_Transmit(&WRITE_ENABLE, 1);
-    FLASH_CS_High();
+    FlashInstruction writeEnable = {.opCode = WRITE_ENABLE};
+
+    if (FLASH_QSPIInstruction(&writeEnable) != 0)
+    {
+        printf("Error: Failed to enable writes\r\n");
+    }
+}
+
+// Disable write operations to the flash memory
+void FLASH_WriteDisable(void)
+{
+    FlashInstruction writeDisable = {.opCode = WRITE_DISABLE};
+
+    if (FLASH_QSPIInstruction(&writeDisable) != 0)
+    {
+        printf("Error: Failed to disable writes\r\n");
+    }
 }
 
 // Write to the flash memory's data buffer
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
-    uint8_t columnAddressBytes[2] = {(columnAddress >> 8) & 0xFF,
-                                     (columnAddress & 0xFF)}; // Unpack into 2 bytes, ignore endianness
+    FlashInstruction writeBuffer = {
+        .opCode = WRITE_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dataMode = TRANSMIT,
+        .dataBuf = data,
+        .dataSize = size,
+        .linesUsed = 1,
+    };
 
-    FLASH_WriteEnable();
     FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&WRITE_BUFFER, 1);
-    FLASH_Transmit(columnAddressBytes, 2); // Shift in 2-byte column address (only last 12 bits used)
-    FLASH_Transmit(data, size);
-    FLASH_CS_High();
+    FLASH_WriteEnable();
+    if (FLASH_QSPIInstruction(&writeBuffer) != 0)
+    {
+        printf("Error: Failed to write to data buffer\r\n");
+    }
 }
 
-// Write data in buffer to a page with a 3 byte address (Only up to end of page, extra data discarded)
+// Write data in buffer to a page with a 3 byte address
 void FLASH_WriteExecute(uint32_t pageAddress)
 {
+    FlashInstruction writeExecute = {
+        .opCode = WRITE_EXECUTE,
+        .address = pageAddress,
+        .addressSize = 3,
+    };
+
     FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&WRITE_EXECUTE, 1);
-    // Shift in 3-byte page address (last 18 bits used, others dummy)
-    uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF,
-                                   pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
-    FLASH_Transmit(pageAddressBytes, 3);
-    FLASH_CS_High();
+    if (FLASH_QSPIInstruction(&writeExecute) != 0)
+    {
+        printf("Error: Failed to write buffer into flash\r\n");
+    }
     osDelay(1); // TODO: Should be 700 microseconds
 }
 
@@ -233,44 +273,49 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 // Erase the entire data buffer
 void FLASH_EraseBuffer(void)
 {
-    uint16_t columnAddress = 0;
+    FlashInstruction eraseBuffer = {
+        .opCode = WRITE_BUFFER_WITH_RESET,
+        .address = 0,
+        .addressSize = 2,
+    };
 
     FLASH_WriteEnable();
     FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&WRITE_BUFFER_WITH_RESET, 1);
-    FLASH_Transmit(&columnAddress, 2); // Shift in 2-byte column address (only last 12 bits used)
-    FLASH_CS_High();
-}
-
-// Erase the given block address without any delay, returning status register after
-int FLASH_EraseWithoutDelay(uint16_t blockAddress)
-{
-    FLASH_WriteEnable();
-    FLASH_CS_Low();
-    FLASH_Transmit(&ERASE_BLOCK, 1);
-    uint32_t pageAddress = blockAddress * 64;
-    uint8_t pageAddressBytes[3] = {(pageAddress >> 16) & 0xFF, (pageAddress >> 8) & 0xFF,
-                                   pageAddress & 0xFF}; // Unpack into 3 bytes, ignore endianness
-    FLASH_Transmit(pageAddressBytes, 3);
-    FLASH_CS_High();
-    return FLASH_ReadRegister(3);
+    if (FLASH_QSPIInstruction(&eraseBuffer) != 0)
+    {
+        printf("Error: Failed to erase buffer\r\n");
+    }
+    FLASH_WriteDisable();
 }
 
 // Erase the block at the given block address (between 0 and 4095)
 void FLASH_EraseBlock(uint16_t blockAddress)
 {
-    FLASH_EraseWithoutDelay(blockAddress);
+    FlashInstruction eraseBlock = {
+        .opCode = ERASE_BLOCK,
+        .address = blockAddress * 64,
+        .addressSize = 3,
+    };
+
+    FLASH_AwaitNotBusy();
+    FLASH_WriteEnable();
+    if (FLASH_QSPIInstruction(&eraseBlock) != 0)
+    {
+        printf("Error: Failed to erase block\r\n");
+    }
     osDelay(10); // TODO: Is this delay really needed since we check BUSY bit?
 }
 
 // Resets device software and disables write protection
 void FLASH_ResetDeviceSoftware(void)
 {
+    FlashInstruction resetSoftware = {.opCode = RESET_DEVICE};
+
     FLASH_AwaitNotBusy();
-    FLASH_CS_Low();
-    FLASH_Transmit(&RESET_DEVICE, 1);
-    FLASH_CS_High();
+    if (FLASH_QSPIInstruction(&resetSoftware) != 0)
+    {
+        printf("Failed to reset software\r\n");
+    }
     FLASH_DisableWriteProtect();
 }
 
