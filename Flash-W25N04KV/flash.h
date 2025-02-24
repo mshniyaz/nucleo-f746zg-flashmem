@@ -10,8 +10,6 @@
 
 #include "cmsis_os.h"
 #include "stm32f7xx_hal.h"
-#include "stm32f7xx_hal_qspi.h"
-#include "stm32f7xx_hal_uart.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -19,18 +17,24 @@
 #include <string.h>
 
 // Instruction Set Constants
-#define READ_REGISTER 0x0F
 #define GET_JEDEC 0x9F
+#define READ_REGISTER 0x0F
 #define WRITE_REGISTER 0x01
 #define READ_PAGE 0x13
 #define READ_BUFFER 0x03
 #define WRITE_ENABLE 0x06
 #define WRITE_DISABLE 0x04
 #define WRITE_BUFFER 0x84
+#define QUAD_WRITE_BUFFER 0x34
 #define WRITE_BUFFER_WITH_RESET 0x02
 #define WRITE_EXECUTE 0x10
 #define ERASE_BLOCK 0xD8
 #define RESET_DEVICE 0xFF
+
+// TODO: Impelement below instructions
+#define FAST_READ_BUFFER 0x0B
+#define FAST_DUAL_READ_BUFFER 0x3B
+#define FAST_QUAD_READ_BUFFER 0x6B
 
 // Addresses of 3 status registers
 #define REGISTER_ONE 0xA0
@@ -45,20 +49,19 @@ static const uint8_t REGISTERS[] = {REGISTER_ONE, REGISTER_TWO, REGISTER_THREE};
 // Macros to use when selecting transmit or receive in instruction
 #define TRANSMIT 1
 #define RECEIVE 2
-// Macro redefining address none as page 0 can be written to
-#define ADDRESS_NONE 0xFFFFFFFF
 
 // Struct to issue instructions
 typedef struct
 {
-    uint8_t opCode;       // Single byte operation code
-    uint32_t address;     // Address to be sent
-    uint16_t addressSize; // Size of address in bytes (2-3)
-    uint8_t dummyClocks;  // Number of dummy clock cycles to send
-    uint8_t dataMode;     // TRANSMIT or RECEIVE macros to determine whether to trasmit or receive data
-    uint8_t *dataBuf;     // Buffer to store data to trasmit/hold received data
-    uint16_t dataSize;    // Size of data in bytes
-    uint8_t linesUsed;    // Number of QSPI lines used for transmit/receive
+    uint8_t opCode;            // Single byte operation code
+    uint32_t address;          // Address to be sent
+    uint16_t addressSize;      // Size of address in bytes (2-3)
+    uint32_t addressLinesUsed; // Lines to use to transmit address
+    uint8_t dummyClocks;       // Number of dummy clock cycles to send
+    uint8_t dataMode;          // TRANSMIT or RECEIVE macros to determine whether to trasmit or receive data
+    uint8_t *dataBuf;          // Buffer to store data to trasmit/hold received data
+    uint16_t dataSize;         // Size of data in bytes
+    uint8_t dataLinesUsed;     // Number of QSPI lines used for transmit/receive of data
 } FlashInstruction;
 
 //! Structs to parse pages
@@ -100,23 +103,27 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction);
 
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
+void FLASH_ResetDeviceSoftware(void);
 bool FLASH_IsWEL(void);
 bool FLASH_IsBusy(void);
 
 // Read functions
 void FLASH_ReadJEDECID(void);
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 void FLASH_ReadPage(uint32_t pageAddress);
 
 // Write Functions
 void FLASH_WriteEnable(void);
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
+void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 void FLASH_WriteExecute(uint32_t pageAddress);
 
 // Erase Functions
 void FLASH_EraseBuffer(void);
 void FLASH_EraseBlock(uint16_t blockAddress);
-void FLASH_ResetDeviceSoftware(void);
 void FLASH_EraseDevice(void);
 
 // Circular Buffer Functions
@@ -125,7 +132,8 @@ void FLASH_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2]);
 // CLI Listening Functions
 void FLASH_ListenCommands(void);
 void FLASH_RunCommand(char *cmdStr);
-// Testing functions
+
+// Testing functions (Not for external use)
 void FLASH_ResetDeviceCmd(void);
 void FLASH_TestRegistersCmd(void);
 void FLASH_TestDataCmd(void);

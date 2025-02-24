@@ -7,23 +7,30 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
 {
     QSPI_CommandTypeDef sCommand = {0};
 
-    sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE; // Set instruction (opcode)
+    // Set instruction (opcode)
+    sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE;
     sCommand.Instruction = instruction->opCode;
-    sCommand.AddressMode =
-        (instruction->addressSize > 0) ? QSPI_ADDRESS_1_LINE : QSPI_ADDRESS_NONE; // Set address mode and size
+    sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE; // Alternate bytes (not used)
+    // Set address mode and size (address mode is 1 line by default unless addressSize is 0)
+    sCommand.AddressMode = (instruction->addressSize == NULL)     ? QSPI_ADDRESS_NONE
+                           : (instruction->addressLinesUsed == 1) ? QSPI_ADDRESS_1_LINE
+                           : (instruction->addressLinesUsed == 2) ? QSPI_ADDRESS_2_LINES
+                           : (instruction->addressLinesUsed == 4) ? QSPI_ADDRESS_4_LINES
+                                                                  : QSPI_ADDRESS_1_LINE;
+    sCommand.Address = (instruction->addressSize > 0) ? instruction->address : QSPI_ADDRESS_NONE;
     sCommand.AddressSize = (instruction->addressSize == 1)   ? QSPI_ADDRESS_8_BITS
                            : (instruction->addressSize == 2) ? QSPI_ADDRESS_16_BITS
                            : (instruction->addressSize == 3) ? QSPI_ADDRESS_24_BITS
                            : (instruction->addressSize == 4) ? QSPI_ADDRESS_32_BITS
                                                              : QSPI_ADDRESS_NONE;
-    sCommand.Address = (instruction->addressSize > 0) ? instruction->address : 0; // Pass in address if provided
-    sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;                       // Alternate bytes (not used)
-    sCommand.DummyCycles = (instruction->dummyClocks != NULL) ? instruction->dummyClocks : 0; // Dummy cycles
-    sCommand.DataMode = (instruction->dataMode == NULL) ? QSPI_DATA_NONE
-                        : (instruction->linesUsed == 1) ? QSPI_DATA_1_LINE
-                        : (instruction->linesUsed == 2) ? QSPI_DATA_2_LINES
-                        : (instruction->linesUsed == 4) ? QSPI_DATA_4_LINES
-                                                        : QSPI_DATA_NONE; // Set data mode (1, 2, or 4 lines)
+    // Dummy cycles for operations that require delays at high clock frequencies
+    sCommand.DummyCycles = (instruction->dummyClocks != NULL) ? instruction->dummyClocks : 0;
+    // Set data mode and size (data mode is 1 line by default unless dataSize is 0)
+    sCommand.DataMode = (instruction->dataSize == NULL)     ? QSPI_DATA_NONE
+                        : (instruction->dataLinesUsed == 1) ? QSPI_DATA_1_LINE
+                        : (instruction->dataLinesUsed == 2) ? QSPI_DATA_2_LINES
+                        : (instruction->dataLinesUsed == 4) ? QSPI_DATA_4_LINES
+                                                            : QSPI_DATA_1_LINE;
     sCommand.NbData = instruction->dataSize;
 
     // Send command
@@ -56,21 +63,6 @@ int FLASH_QSPIInstruction(FlashInstruction *instruction)
     return 0; // Instruction successful
 }
 
-// Wrapper for all addresses (to ensure big-endian across all architectures)
-// uint32_t addressWrapper(uint32_t address)
-// {
-//     // Break into byte array
-//     uint8_t byteArray[4];
-//     byteArray[0] = (address >> 24) & 0xFF;
-//     byteArray[1] = (address >> 16) & 0xFF;
-//     byteArray[2] = (address >> 8) & 0xFF;
-//     byteArray[3] = address & 0xFF;
-
-//     // Reconstruct into address
-//     uint32_t newAddress = (byteArray[0] << 24) | (byteArray[1] << 16) | (byteArray[2] << 8) | byteArray[3];
-//     return newAddress;
-// }
-
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
@@ -84,7 +76,6 @@ uint8_t FLASH_ReadRegister(int registerNo)
         .dataMode = RECEIVE,
         .dataBuf = &registerResponse,
         .dataSize = 1,
-        .linesUsed = 1,
     };
 
     if (FLASH_QSPIInstruction(&readRegister) != 0)
@@ -107,7 +98,6 @@ void FLASH_DisableWriteProtect(void)
         .dataMode = TRANSMIT,
         .dataBuf = &registerVal,
         .dataSize = 1,
-        .linesUsed = 1,
     };
 
     if (FLASH_QSPIInstruction(&disableWriteProtect) != 0)
@@ -153,7 +143,6 @@ void FLASH_ReadJEDECID(void)
         .dataMode = RECEIVE,
         .dataBuf = jedecResponse,
         .dataSize = 3,
-        .linesUsed = 1,
     };
 
     if (FLASH_QSPIInstruction(&readJEDEC) != 0)
@@ -197,12 +186,71 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
         .dataMode = RECEIVE,
         .dataBuf = readResponse,
         .dataSize = size,
-        .linesUsed = 1,
     };
 
     if (FLASH_QSPIInstruction(&readBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
+    }
+}
+
+// TODO: Figure out what this command actually does
+// Read buffer for higher clock rates
+void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+{
+    FlashInstruction fastReadBuffer = {
+        .opCode = FAST_READ_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dummyClocks = 8,
+        .dataMode = RECEIVE,
+        .dataBuf = readResponse,
+        .dataSize = size,
+    };
+
+    if (FLASH_QSPIInstruction(&fastReadBuffer) != 0)
+    {
+        printf("Error: Failed to read data buffer\r\n");
+    }
+}
+
+// Read buffer on 2 lines
+void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+{
+    FlashInstruction fastDualReadBuffer = {
+        .opCode = FAST_DUAL_READ_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dummyClocks = 8,
+        .dataMode = RECEIVE,
+        .dataBuf = readResponse,
+        .dataSize = size,
+        .dataLinesUsed = 2,
+    };
+
+    if (FLASH_QSPIInstruction(&fastDualReadBuffer) != 0)
+    {
+        printf("Error: Failed to read data buffer on 2 lines\r\n");
+    }
+}
+
+// Read buffer on 4 lines
+void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+{
+    FlashInstruction fastQuadReadBuffer = {
+        .opCode = FAST_QUAD_READ_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dummyClocks = 8,
+        .dataMode = RECEIVE,
+        .dataBuf = readResponse,
+        .dataSize = size,
+        .dataLinesUsed = 4,
+    };
+
+    if (FLASH_QSPIInstruction(&fastQuadReadBuffer) != 0)
+    {
+        printf("Error: Failed to read data buffer on 4 lines\r\n");
     }
 }
 
@@ -240,7 +288,6 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
         .dataMode = TRANSMIT,
         .dataBuf = data,
         .dataSize = size,
-        .linesUsed = 1,
     };
 
     FLASH_AwaitNotBusy();
@@ -248,6 +295,27 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
     if (FLASH_QSPIInstruction(&writeBuffer) != 0)
     {
         printf("Error: Failed to write to data buffer\r\n");
+    }
+}
+
+// Write to the flash memory's data buffer on 4 lines
+void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
+{
+    FlashInstruction quadWriteBuffer = {
+        .opCode = QUAD_WRITE_BUFFER,
+        .address = columnAddress,
+        .addressSize = 2,
+        .dataMode = TRANSMIT,
+        .dataBuf = data,
+        .dataSize = size,
+        .dataLinesUsed = 4,
+    };
+
+    FLASH_AwaitNotBusy();
+    FLASH_WriteEnable();
+    if (FLASH_QSPIInstruction(&quadWriteBuffer) != 0)
+    {
+        printf("Error: Failed to write to data buffer on 4 lines\r\n");
     }
 }
 
