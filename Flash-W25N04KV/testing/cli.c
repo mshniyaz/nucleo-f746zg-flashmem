@@ -1,11 +1,11 @@
 /*
- * test.c
+ * cli.c
  *
- *  Created on: Dec 16, 2024
- *      Author: niyaz
+ * Contains code to run the CLI, including interrupt driven UART inputs.
+ * Also contains functions to parse and run commands inputted by user
  */
 
-#include "flash.h"
+#include "flash-spi.h"
 
 //! Macros for CRC codes of different commands
 #define HELP_CMD 0x8875cac
@@ -174,19 +174,39 @@ void FLASH_RunCommand(char *cmdStr)
         }
         break;
     case DATA_TEST_CMD:
-        // Parse given parameters
-        uint32_t testPageAddress = 0; // Params for the test
+        // Default parameter values
+        uint32_t linesUsed = 1;
+        uint32_t multilineAddress = 0;
+        uint32_t testPageAddress = 0; //! This parameter is left as default
+
+        // Parse the params
         if (paramCount >= 1)
         {
-            uint32_t pageRange[] = {1, 262144};
-            parseParamAsInt(params[0], &testPageAddress, pageRange);
+            uint32_t lineRange[] = {1, 4};
+            parseParamAsInt(params[0], &linesUsed, lineRange);
+            if (linesUsed == 3)
+            {
+                linesUsed = 1; // Handle invalid value
+            }
         }
+        if (paramCount >= 2)
+        {
+            uint32_t multiAddressRange[] = {0, 1}; // Boolean value
+            parseParamAsInt(params[1], &multilineAddress, multiAddressRange);
+        }
+        // if (paramCount >= 3)
+        // {
+        //     uint32_t pageRange[] = {1, 262144};
+        //     parseParamAsInt(params[2], &testPageAddress, pageRange);
+        // }
 
         // Enqueue parameters
+        osMessageQueuePut(cmdParamQueueHandle, &linesUsed, 0, 0);
+        osMessageQueuePut(cmdParamQueueHandle, &multilineAddress, 0, 0);
         osMessageQueuePut(cmdParamQueueHandle, &testPageAddress, 0, 0);
 
         // Create a new thread to run the register-test command
-        const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
+        const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 3000 * 4};
         if (osThreadNew(FLASH_TestDataCmd, NULL, &dataTaskAttr) == NULL)
         {
             printf("Failed to generate data-test task\r\n");

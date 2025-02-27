@@ -1,9 +1,11 @@
 # Flash-W25N04KV Library Documentation
 
-The FLASH-W25N04KV library contains functions for operating the flash memory. Detailed documentation can be found in the FLASH-25N04KV folder. Include it in your code with the below:  
+The FLASH-W25N04KV library contains functions for operating the flash memory. Detailed documentation can be found in the FLASH-25N04KV folder. To ensure your project recognises the library, **Right click your project folder in STM32CubeIDE > Properties > C/C++ General > Paths and Symbols > Add "/${ProjName}/Flash-W25N04KV" as a workspace path**.
+
+Use the library with the below:
 
 ```c
-#include <flash.h>
+#include <flash-spi.h>
 ```
 
 This library relies on some of its variables being defined externally, within the file it is included in. All of the below must be configured within the .ioc file of the project (locations in .ioc file menu shown as comments).
@@ -40,7 +42,7 @@ Reads the value of a specified register.
 
 **Returns**:  
 
-- The value of the register.
+- The value of the register. If the register fails to be read, `INT8_MAX` will be returned
 
 ## Read Functions
 
@@ -48,7 +50,17 @@ Reads the value of a specified register.
 void FLASH_ReadJEDECID(void)
 ```
 
-Reads and prints the JEDEC ID of the flash memory device via UART.
+Reads and prints the JEDEC ID of the flash memory device via UART. Used in the CLI as a quick check to ensure SPI is working.
+
+```c
+void FLASH_ReadPage(uint32_t pageAddress)
+```
+
+Reads an entire page of data from the specified page address into the data buffer.
+
+**Params**:  
+
+- `pageAddress`: The address of the page to read, from 0 to 262143.
 
 ```c
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
@@ -63,14 +75,64 @@ Reads data from the flash memory's data buffer, starting at the specified column
 - `readResponse`: Pointer to the buffer to store the read data.  
 
 ```c
-void FLASH_ReadPage(uint32_t pageAddress)
+void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 ```
 
-Reads an entire page of data from the specified page address into the data buffer.
+Reads data from the flash memory's data buffer. Functionally the sane as `FLASH_ReadBuffer` for this flash, but may give access to higher clock rates in other WinBond flash devices.
 
 **Params**:  
 
-- `pageAddress`: The address of the page to read, from 0 to 262143.
+- `columnAddress`: The starting column address.  
+- `size`: The number of bytes to read.  
+- `readResponse`: Pointer to the buffer to store the read data.  
+
+```c
+void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+```
+
+Reads data from the flash memory's data buffer using 2 lines (IO0 and IO1), but sends address on IO0 only.
+
+**Params**:  
+
+- `columnAddress`: The starting column address.  
+- `size`: The number of bytes to read.  
+- `readResponse`: Pointer to the buffer to store the read data.  
+
+```c
+void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+```
+
+Reads data from the flash memory's data buffer using 2 lines (IO0 and IO1), also sending the address on 2 lines.
+
+**Params**:  
+
+- `columnAddress`: The starting column address.  
+- `size`: The number of bytes to read.  
+- `readResponse`: Pointer to the buffer to store the read data.  
+
+```c
+void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+```
+
+Reads data from the flash memory's data buffer using 4 lines (IO0-IO3), but sends address on IO0 only.
+
+**Params**:  
+
+- `columnAddress`: The starting column address.  
+- `size`: The number of bytes to read.  
+- `readResponse`: Pointer to the buffer to store the read data.  
+
+```c
+void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+```
+
+Reads data from the flash memory's data buffer using 4 lines (IO0-IO3), also sending the address on 4 lines.
+
+**Params**:  
+
+- `columnAddress`: The starting column address.  
+- `size`: The number of bytes to read.  
+- `readResponse`: Pointer to the buffer to store the read data.  
 
 ## Write Functions
 
@@ -81,10 +143,28 @@ void FLASH_WriteEnable(void)
 Enables write operations for the flash memory, setting the Write Enable Latch (WEL) bit to 1.
 
 ```c
+void FLASH_WriteDisable(void)
+```
+
+Disables write operations for the flash memory, setting the Write Enable Latch (WEL) bit to 0.
+
+```c
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 ```
 
 Writes data into the data buffer at the specified column address. Data exceeding the buffer size is discarded.  
+
+**Params**:  
+
+- `data`: Pointer to the buffer containing the data to write.  
+- `size`: The number of bytes to write.  
+- `columnAddress`: The starting column address.
+
+```c
+void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
+```
+
+Writes data into the data buffer at the specified column address using 4 lines. Data exceeding the buffer size is discarded.  
 
 **Params**:  
 
@@ -100,7 +180,7 @@ Commits the data written to the buffer to the specified page address.
 
 **Params**:  
 
-- `pageAddress`: The address of the page to write to, between 0 and 262143.  // Testing functions
+- `pageAddress`: The address of the page to write to, between 0 and 262143.  
 
 ## Erase Functions
 
