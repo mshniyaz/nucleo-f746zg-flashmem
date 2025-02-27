@@ -23,7 +23,7 @@ Meant for use with the [STM32CubeIDE](https://www.st.com/en/development-tools/st
 
 ## .ioc File Configuration
 
-![](https://github.com/user-attachments/assets/428bf828-9ed9-429b-8cf4-32e1527f9b25)
+![CubeMX .ioc file editor](https://github.com/user-attachments/assets/428bf828-9ed9-429b-8cf4-32e1527f9b25)
 
 The **.ioc** file must be configured correctly based on the board being used. The **.ioc** file included is preconfigured for the Nucleo F746ZG. After opening the **.ioc** file in the STM32CubeIDE, pinouts can be changed in the Pinout & Configuration tab, with peripheral configuration on the left. 
 
@@ -100,7 +100,7 @@ setvbuf(stdout, NULL, _IONBF, 0); // Disables buffering for stdout
 
 ## Accessing the CLI
 
-[INSERT IMAGE HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEERE]
+![Minicom CLI](https://github.com/user-attachments/assets/b8b4b4be-482a-41cf-86c6-1767e4d7e08f)
 
 To access the Command Line Interface (CLI) provided, use a serial communication program like Minicom or Picocom (for Linux) or PuTTY and Tera Term (for Windows). The CLI has been tested with Minicom 2.8 on Ubuntu 22.04.5 LTS.
 
