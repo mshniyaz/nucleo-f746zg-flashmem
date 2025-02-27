@@ -23,13 +23,57 @@
         }                                                                                                              \
     } while (0)
 
+// Generic read and write functions
+void FLASH_GenericRead(uint16_t columnAddress, uint16_t size, uint8_t *readResponse, uint8_t linesUsed,
+                       bool multilineAddress)
+{
+    if (linesUsed == 2)
+    {
+        if (multilineAddress)
+        {
+            FLASH_FastDualReadIO(columnAddress, size, readResponse);
+        }
+        else
+        {
+            FLASH_FastDualReadBuffer(columnAddress, size, readResponse);
+        }
+    }
+    else if (linesUsed == 4)
+    {
+        if (multilineAddress)
+        {
+            FLASH_FastQuadReadIO(columnAddress, size, readResponse);
+        }
+        else
+        {
+            FLASH_FastQuadReadBuffer(columnAddress, size, readResponse);
+        }
+    }
+    else
+    {
+        FLASH_FastReadBuffer(columnAddress, size, readResponse); // Use 1 line by default
+    }
+}
+
+void FLASH_GenericWrite(uint8_t *data, uint16_t size, uint16_t columnAddress, uint8_t linesUsed)
+{
+    if (linesUsed == 4)
+    {
+        FLASH_QuadWriteBuffer(data, size, columnAddress);
+    }
+    else
+    {
+        FLASH_WriteBuffer(data, size, columnAddress); // Use 1 line as default
+    }
+}
+
 // Flag to track if a test throws an error
 static int errCode = 0;
 
 // Print list of commands
 void FLASH_GetHelpCmd(void)
 {
-    printf("\r\nCOMMANDS\r\n");
+    printf("\r\n------COMMANDS------\r\n");
     printf("FORMAT:\t<command> [<args>...]\r\n\n");
 
     printf("help\r\n");
@@ -41,17 +85,18 @@ void FLASH_GetHelpCmd(void)
     printf("register-test\r\n");
     printf("Verifies the values and functionality of the flash status registers.\r\n\n");
 
-    printf("data-test [testPageAddress]\r\n");
-    printf("Performs tests to ensure buffer, reads, writes, and erases work properly.\r\n");
-    printf("Location of tests can be controlled via testPageAddress (page p).\r\n");
-    printf("Note that test involves writing and erasing of page p, p+1, and p+64 (next block).\r\n");
+    printf("data-test [linesUsed] [multilineAddress]\r\n");
+    printf("[linesUsed]: number of QSPI lines used in transmitting or receiving data.\r\n");
+    printf("[multilineAddress]: boolean (1/0), determines whether the address is transmitted multiline\r\n");
+    printf("Note that test involves writing and erasing of page p, p+1, and p+64 (next block), where p is 0 by "
+           "default\r\n");
     printf("Last block of a page will not be accepted as a valid input for testPageAddress.\r\n\n");
 
     printf("head-tail-test\r\n");
     printf("Ensures flash is able to correctly detect head and tail of circular data buffer.\r\n\n");
 
     // Print out status details about FreeRTOS
-    printf("FREERTOS DETAILS\r\n");
+    printf("------FREERTOS DETAILS------\r\n");
     printf("Stack Remaining for current task: %u bytes\r\n", uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t));
     printf("Free heap: %lu bytes\r\n\n", xPortGetFreeHeapSize());
 }
@@ -108,10 +153,19 @@ void FLASH_TestRegistersCmd(void)
 void FLASH_TestDataCmd(void)
 {
     // Fetch parameters from queue
-    uint32_t testPageAddress;
+    uint32_t linesUsed, multilineAddress, testPageAddress;
+    osMessageQueueGet(cmdParamQueueHandle, &linesUsed, NULL, 0);
+    osMessageQueueGet(cmdParamQueueHandle, &multilineAddress, NULL, 0);
     osMessageQueueGet(cmdParamQueueHandle, &testPageAddress, NULL, 0);
     errCode = 0; // Set error flag to default
-    printf("\r\nTesting read, write, and erase functionality around page %u\r\n\n", testPageAddress);
+    printf("\r\nTesting read, write, and erase functionality around page %u\r\n", testPageAddress);
+    // Print out type of test
+    char *readType = (linesUsed == 4) ? "Quad" : (linesUsed == 2) ? "Dual" : "Single";
+    char *addressType = (linesUsed == 4 && multilineAddress)   ? "Quad"
+                        : (linesUsed == 2 && multilineAddress) ? "Dual"
+                                                               : "Single";
+    char *writeType = (linesUsed == 4) ? "Quad" : "Single";
+    printf("Using %s read, %s address, %s writes\r\n\n", readType, addressType, writeType);
 
     // Data buffers
     uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68};
@@ -119,47 +173,47 @@ void FLASH_TestDataCmd(void)
     uint8_t readResponse[4];
 
     // Check if data buffer is properly filled
-    FLASH_WriteBuffer(testData, 4, 0);
-    FLASH_ReadBuffer(0, 4, readResponse); // Read the buffer from position 0
+    FLASH_GenericWrite(testData, 4, 0, linesUsed);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress); // Read the buffer from position 0
     ASSERT(memcmp(readResponse, testData, 4) == 0, "Failed to write to the data buffer correctly");
 
-    FLASH_ReadBuffer(2, 4, readResponse); // Read the buffer from position 2
+    FLASH_GenericRead(2, 4, readResponse, linesUsed, multilineAddress); // Read the buffer from position 2
     uint8_t bitShiftedResponse[4] = {testData[2], testData[3], 0xFF, 0xFF};
     ASSERT(memcmp(readResponse, bitShiftedResponse, 4) == 0,
            "Failed to read data buffer correctly at a non-zero bit address");
 
     // Execute write to first 4 bytes of page testPageAddress, testPageAddress+1, testPageAddress+64
     FLASH_WriteExecute(testPageAddress);
-    FLASH_WriteBuffer(testData, 4, 0);
+    FLASH_GenericWrite(testData, 4, 0, linesUsed);
     FLASH_WriteExecute(testPageAddress + 1);
-    FLASH_WriteBuffer(testData, 4, 0);
+    FLASH_GenericWrite(testData, 4, 0, linesUsed);
     FLASH_WriteExecute(testPageAddress + 64);
-    FLASH_ReadBuffer(0, 4, readResponse); // Expect empty buffer after write execute
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress); // Expect empty buffer after write execute
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Buffer fails to flush data when writing to a page");
 
     // Reads page testPageAddress, expects buffer to be full
     FLASH_ReadPage(testPageAddress);
-    FLASH_ReadBuffer(0, 4, readResponse);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, testData, 4) == 0, "Failed to write to page and read it into data buffer");
 
     // Reads page testPageAddress+2, expects buffer to be empty
     FLASH_ReadPage(testPageAddress + 2);
-    FLASH_ReadBuffer(0, 4, readResponse);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Never wrote to page but it is non-empty");
 
     // Check that block with testPageAddress is properly erased
     FLASH_EraseBlock(testPageAddress / 64);
     FLASH_ReadPage(testPageAddress);
-    FLASH_ReadBuffer(0, 4, readResponse);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Failed to erase block");
 
     FLASH_ReadPage(testPageAddress + 1);
-    FLASH_ReadBuffer(0, 4, readResponse);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Failed to erase block");
 
     // Check that page testPageAddress+64 is not erased
     FLASH_ReadPage(testPageAddress + 64);
-    FLASH_ReadBuffer(0, 4, readResponse);
+    FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, testData, 4) == 0, "Page was erroneously erased");
 
     // Erase block containing testPageAddress+64 to prep for next test
