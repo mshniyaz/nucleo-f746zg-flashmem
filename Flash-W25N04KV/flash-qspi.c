@@ -23,6 +23,7 @@ void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *re
         .dataLinesUsed = 4,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&fastQuadReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer on 4 lines\r\n");
@@ -44,6 +45,7 @@ void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataLinesUsed = 4,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&fastQuadReadIO) != 0)
     {
         printf("Error: Failed to send address and read data buffer on 4 lines\r\n");

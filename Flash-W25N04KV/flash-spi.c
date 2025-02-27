@@ -131,11 +131,14 @@ bool FLASH_IsBusy(void)
 // Wait till BUSY bit is cleared to zero
 void FLASH_AwaitNotBusy(void)
 {
-    if (FLASH_IsBusy())
+    // Repeatedly poll busy bit till success
+    while (FLASH_IsBusy())
     {
-        osDelay(1); // TODO: Check if there is any better delay
-        FLASH_AwaitNotBusy();
+        // TODO: Is constant polling like this ok? Is it blocking?
+        // Delay till BUSY bit is 0
     }
+
+    return;
 }
 
 //! Read Operations
@@ -180,7 +183,6 @@ void FLASH_ReadPage(uint32_t pageAddress)
     {
         printf("Error: Failed to read page %u\r\n", pageAddress);
     }
-    osDelay(1); // TODO: Should be 25 microseconds
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
@@ -196,6 +198,7 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
         .dataSize = size,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&readBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
@@ -215,6 +218,7 @@ void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataSize = size,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&fastReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
@@ -235,6 +239,7 @@ void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *re
         .dataLinesUsed = 2,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&fastDualReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer on 2 lines\r\n");
@@ -256,6 +261,7 @@ void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataLinesUsed = 2,
     };
 
+    FLASH_AwaitNotBusy();
     if (FLASH_QSPIInstruct(&fastDualReadIO) != 0)
     {
         printf("Error: Failed to send address and read data buffer on 2 lines\r\n");
@@ -320,7 +326,6 @@ void FLASH_WriteExecute(uint32_t pageAddress)
     {
         printf("Error: Failed to write buffer into flash\r\n");
     }
-    osDelay(1); // TODO: Should be 700 microseconds
 }
 
 //! Erase Operations
@@ -358,7 +363,6 @@ void FLASH_EraseBlock(uint16_t blockAddress)
     {
         printf("Error: Failed to erase block\r\n");
     }
-    osDelay(10); // TODO: Is this delay really needed since we check BUSY bit?
 }
 
 // Resets device software and disables write protection

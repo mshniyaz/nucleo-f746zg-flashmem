@@ -24,7 +24,9 @@
 #define READ_BUFFER 0x03
 #define FAST_READ_BUFFER 0x0B
 #define FAST_DUAL_READ_BUFFER 0x3B
+#define FAST_DUAL_READ_IO 0xBB
 #define FAST_QUAD_READ_BUFFER 0x6B
+#define FAST_QUAD_READ_IO 0xEB
 #define WRITE_ENABLE 0x06
 #define WRITE_DISABLE 0x04
 #define WRITE_BUFFER 0x84
@@ -33,10 +35,6 @@
 #define WRITE_EXECUTE 0x10
 #define ERASE_BLOCK 0xD8
 #define RESET_DEVICE 0xFF
-
-// TODO: Impelement below instructions
-#define FAST_DUAL_READ_IO 0xBB
-#define FAST_QUAD_READ_IO 0xEB
 
 // Addresses of 3 status registers
 #define REGISTER_ONE 0xA0

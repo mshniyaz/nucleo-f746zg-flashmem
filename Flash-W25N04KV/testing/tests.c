@@ -13,8 +13,8 @@
     {                                                                                                                  \
         if (!(condition))                                                                                              \
         {                                                                                                              \
-            printf("\r\nTest Failed: %s (File: %s, Line: %d)\r\n", #condition, __FILE__, __LINE__);                    \
-            printf("[ERROR] %s\r\n", message);                                                                         \
+            printf("[ERROR] %s\r\n\n", message);                                                                       \
+            printf("Test Failed: %s (File: %s, Line: %d)\r\n", #condition, __FILE__, __LINE__);                        \
             errCode = 1;                                                                                               \
         }                                                                                                              \
         else                                                                                                           \
@@ -119,8 +119,6 @@ void FLASH_TestDataCmd(void)
     uint8_t testData[4] = {0x34, 0x5b, 0x78, 0x68};
     uint8_t emptyResponse[4] = {0xFF, 0xFF, 0xFF, 0xFF};
     uint8_t readResponse[4];
-    // TODO: Add dynamic prints
-    // char printBuf[64]; // Buffer to use with snprintf
 
     // Check if data buffer is properly filled
     FLASH_WriteBuffer(testData, 4, 0);
