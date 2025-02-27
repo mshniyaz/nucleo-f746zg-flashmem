@@ -119,6 +119,7 @@ void FLASH_ReadPage(uint32_t pageAddress);
 
 // Write Functions
 void FLASH_WriteEnable(void);
+void FLASH_WriteDisable(void);
 void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 void FLASH_WriteExecute(uint32_t pageAddress);
@@ -133,9 +134,9 @@ void FLASH_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2]);
 
 // CLI Listening Functions
 void FLASH_ListenCommands(void);
-void FLASH_RunCommand(char *cmdStr);
 
 // Testing functions (Not for external use)
+void FLASH_RunCommand(char *cmdStr);
 void FLASH_ResetDeviceCmd(void);
 void FLASH_TestRegistersCmd(void);
 void FLASH_TestDataCmd(void);

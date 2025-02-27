@@ -97,7 +97,7 @@ int main(void)
 
     /* USER CODE BEGIN Init */
     __HAL_DBGMCU_FREEZE_TIM6();       //! Freeze TIM6 during debug halt
-    setvbuf(stdout, NULL, _IONBF, 0); //! Disables buffering for stdout (May affect performance?)
+    setvbuf(stdout, NULL, _IONBF, 0); //! Disables buffering for stdout
     /* USER CODE END Init */
 
     /* Configure the system clock */
@@ -441,7 +441,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
 /**
  * @brief  Retargets the C library printf function to the USART.
  *   None

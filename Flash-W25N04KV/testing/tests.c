@@ -104,10 +104,11 @@ void FLASH_GetHelpCmd(void)
 // Sequentially erases all blocks
 void FLASH_ResetDeviceCmd(void)
 {
+    uint32_t startTime = HAL_GetTick();
     printf("\r\nPerforming software and data reset...\r\n");
     FLASH_ResetDeviceSoftware();
     FLASH_EraseDevice();
-    printf("Reset complete\r\n");
+    printf("Reset complete, time taken: %ums\r\n", HAL_GetTick() - startTime);
 
     osThreadExit(); // Safely exit thread
 }
@@ -115,6 +116,7 @@ void FLASH_ResetDeviceCmd(void)
 // Perform sequence to test registers
 void FLASH_TestRegistersCmd(void)
 {
+    uint32_t startTime = HAL_GetTick();
     errCode = 0; // Set error flag to default
     printf("\r\nTesting flash's register values and functionality\r\n\n");
 
@@ -146,12 +148,14 @@ void FLASH_TestRegistersCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed\r\n");
     }
+    printf("Time taken: %ums", HAL_GetTick() - startTime);
     osThreadExit(); // Safely exit thread
 }
 
 // Performs sequence to test buffer, read, writes, and erase
 void FLASH_TestDataCmd(void)
 {
+    uint32_t startTime = HAL_GetTick();
     // Fetch parameters from queue
     uint32_t linesUsed, multilineAddress, testPageAddress;
     osMessageQueueGet(cmdParamQueueHandle, &linesUsed, NULL, 0);
@@ -227,12 +231,14 @@ void FLASH_TestDataCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed, ensure tested blocks are empty\r\n");
     }
+    printf("Time taken: %ums", HAL_GetTick() - startTime);
     osThreadExit(); // Safely exit thread
 }
 
 // Test if the flash memory is able to find head and tail given data with gaps
 void FLASH_TestHeadTailCmd(void)
 {
+    uint32_t startTime = HAL_GetTick();
     // Data read buffer and test Packet
     uint8_t testPacket[338] = {
         0x45, 0x8D, 0x35, 0x92, 0x3C, 0xA4, 0x1D, 0xC4, 0x79, 0xEB, 0x41, 0x5F, 0x4B, 0xB4, 0xCC, 0x49, 0x02, 0x53,
@@ -293,5 +299,7 @@ void FLASH_TestHeadTailCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed, circular buffer not working properly\r\n");
     }
+
+    printf("Time taken: %ums", HAL_GetTick() - startTime);
     osThreadExit(); // Safely exit thread
 }
