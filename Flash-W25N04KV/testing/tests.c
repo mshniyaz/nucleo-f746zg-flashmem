@@ -1,4 +1,11 @@
-#include "flash.h"
+/*
+ * tests.c
+ *
+ * Contains code which runs each test. The tests accept parameters
+ * placed in cmdParamQueue by the function calling the test.
+ */
+
+#include "flash-spi.h"
 
 // Custom assert macro to handle errors
 #define ASSERT(condition, message)                                                                                     \
@@ -82,7 +89,7 @@ void FLASH_TestRegistersCmd(void)
         .address = 0,
         .addressSize = 3,
     };
-    FLASH_QSPIInstruction(&eraseBlock);
+    FLASH_QSPIInstruct(&eraseBlock);
     ASSERT(FLASH_IsBusy() == true, "Failed to set BUSY bit in status register during erase operation");
     osDelay(10); // Ensure erase properly terminates
     ASSERT(FLASH_ReadRegister(3) == 0, "WEL and BUSY bits not cleared after erase operation");

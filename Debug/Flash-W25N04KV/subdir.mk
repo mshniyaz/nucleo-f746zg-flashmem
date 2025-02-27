@@ -5,13 +5,16 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Flash-W25N04KV/flash.c 
+../Flash-W25N04KV/flash-qspi.c \
+../Flash-W25N04KV/flash-spi.c 
 
 OBJS += \
-./Flash-W25N04KV/flash.o 
+./Flash-W25N04KV/flash-qspi.o \
+./Flash-W25N04KV/flash-spi.o 
 
 C_DEPS += \
-./Flash-W25N04KV/flash.d 
+./Flash-W25N04KV/flash-qspi.d \
+./Flash-W25N04KV/flash-spi.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -21,7 +24,7 @@ Flash-W25N04KV/%.o Flash-W25N04KV/%.su Flash-W25N04KV/%.cyclo: ../Flash-W25N04KV
 clean: clean-Flash-2d-W25N04KV
 
 clean-Flash-2d-W25N04KV:
-	-$(RM) ./Flash-W25N04KV/flash.cyclo ./Flash-W25N04KV/flash.d ./Flash-W25N04KV/flash.o ./Flash-W25N04KV/flash.su
+	-$(RM) ./Flash-W25N04KV/flash-qspi.cyclo ./Flash-W25N04KV/flash-qspi.d ./Flash-W25N04KV/flash-qspi.o ./Flash-W25N04KV/flash-qspi.su ./Flash-W25N04KV/flash-spi.cyclo ./Flash-W25N04KV/flash-spi.d ./Flash-W25N04KV/flash-spi.o ./Flash-W25N04KV/flash-spi.su
 
 .PHONY: clean-Flash-2d-W25N04KV
 

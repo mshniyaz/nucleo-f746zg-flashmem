@@ -1,9 +1,17 @@
-#include "flash.h"
+/*
+ * flash-spi.c
+ *
+ * Contains code which implements QSPI instructions which
+ * transmit or receive data on only the MISO or MOSI lines.
+ * IO2 and IO3 remain unused.
+ */
+
+#include "flash-spi.h"
 
 //! General Operations
 
 // Issues a command to the flash via QSPI
-int FLASH_QSPIInstruction(FlashInstruction *instruction)
+int FLASH_QSPIInstruct(FlashInstruction *instruction)
 {
     QSPI_CommandTypeDef sCommand = {0};
 
@@ -78,7 +86,7 @@ uint8_t FLASH_ReadRegister(int registerNo)
         .dataSize = 1,
     };
 
-    if (FLASH_QSPIInstruction(&readRegister) != 0)
+    if (FLASH_QSPIInstruct(&readRegister) != 0)
     {
         printf("Error: Failed to read register %u\r\n", registerNo);
         return;
@@ -100,7 +108,7 @@ void FLASH_DisableWriteProtect(void)
         .dataSize = 1,
     };
 
-    if (FLASH_QSPIInstruction(&disableWriteProtect) != 0)
+    if (FLASH_QSPIInstruct(&disableWriteProtect) != 0)
     {
         printf("Error: Failed to disable write protection\r\n");
     }
@@ -145,7 +153,7 @@ void FLASH_ReadJEDECID(void)
         .dataSize = 3,
     };
 
-    if (FLASH_QSPIInstruction(&readJEDEC) != 0)
+    if (FLASH_QSPIInstruct(&readJEDEC) != 0)
     {
         printf("Error: Failed to send JEDEC ID command\r\n");
         return;
@@ -168,7 +176,7 @@ void FLASH_ReadPage(uint32_t pageAddress)
     };
 
     FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruction(&readPage) != 0)
+    if (FLASH_QSPIInstruct(&readPage) != 0)
     {
         printf("Error: Failed to read page %u\r\n", pageAddress);
     }
@@ -188,14 +196,13 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
         .dataSize = size,
     };
 
-    if (FLASH_QSPIInstruction(&readBuffer) != 0)
+    if (FLASH_QSPIInstruct(&readBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
     }
 }
 
-// TODO: Figure out what this command actually does
-// Read buffer for higher clock rates
+// Read buffer for higher clock rates, functionally same as normal read for this flash
 void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastReadBuffer = {
@@ -208,7 +215,7 @@ void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataSize = size,
     };
 
-    if (FLASH_QSPIInstruction(&fastReadBuffer) != 0)
+    if (FLASH_QSPIInstruct(&fastReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
     }
@@ -228,29 +235,30 @@ void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *re
         .dataLinesUsed = 2,
     };
 
-    if (FLASH_QSPIInstruction(&fastDualReadBuffer) != 0)
+    if (FLASH_QSPIInstruct(&fastDualReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer on 2 lines\r\n");
     }
 }
 
-// Read buffer on 4 lines
-void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+// Read buffer on 2 lines, also send address on 2 lines
+void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
-    FlashInstruction fastQuadReadBuffer = {
-        .opCode = FAST_QUAD_READ_BUFFER,
+    FlashInstruction fastDualReadIO = {
+        .opCode = FAST_DUAL_READ_IO,
         .address = columnAddress,
         .addressSize = 2,
-        .dummyClocks = 8,
+        .addressLinesUsed = 2,
+        .dummyClocks = 4,
         .dataMode = RECEIVE,
         .dataBuf = readResponse,
         .dataSize = size,
-        .dataLinesUsed = 4,
+        .dataLinesUsed = 2,
     };
 
-    if (FLASH_QSPIInstruction(&fastQuadReadBuffer) != 0)
+    if (FLASH_QSPIInstruct(&fastDualReadIO) != 0)
     {
-        printf("Error: Failed to read data buffer on 4 lines\r\n");
+        printf("Error: Failed to send address and read data buffer on 2 lines\r\n");
     }
 }
 
@@ -261,7 +269,7 @@ void FLASH_WriteEnable(void)
 {
     FlashInstruction writeEnable = {.opCode = WRITE_ENABLE};
 
-    if (FLASH_QSPIInstruction(&writeEnable) != 0)
+    if (FLASH_QSPIInstruct(&writeEnable) != 0)
     {
         printf("Error: Failed to enable writes\r\n");
     }
@@ -272,7 +280,7 @@ void FLASH_WriteDisable(void)
 {
     FlashInstruction writeDisable = {.opCode = WRITE_DISABLE};
 
-    if (FLASH_QSPIInstruction(&writeDisable) != 0)
+    if (FLASH_QSPIInstruct(&writeDisable) != 0)
     {
         printf("Error: Failed to disable writes\r\n");
     }
@@ -292,30 +300,9 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 
     FLASH_AwaitNotBusy();
     FLASH_WriteEnable();
-    if (FLASH_QSPIInstruction(&writeBuffer) != 0)
+    if (FLASH_QSPIInstruct(&writeBuffer) != 0)
     {
         printf("Error: Failed to write to data buffer\r\n");
-    }
-}
-
-// Write to the flash memory's data buffer on 4 lines
-void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
-{
-    FlashInstruction quadWriteBuffer = {
-        .opCode = QUAD_WRITE_BUFFER,
-        .address = columnAddress,
-        .addressSize = 2,
-        .dataMode = TRANSMIT,
-        .dataBuf = data,
-        .dataSize = size,
-        .dataLinesUsed = 4,
-    };
-
-    FLASH_AwaitNotBusy();
-    FLASH_WriteEnable();
-    if (FLASH_QSPIInstruction(&quadWriteBuffer) != 0)
-    {
-        printf("Error: Failed to write to data buffer on 4 lines\r\n");
     }
 }
 
@@ -329,7 +316,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
     };
 
     FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruction(&writeExecute) != 0)
+    if (FLASH_QSPIInstruct(&writeExecute) != 0)
     {
         printf("Error: Failed to write buffer into flash\r\n");
     }
@@ -349,7 +336,7 @@ void FLASH_EraseBuffer(void)
 
     FLASH_WriteEnable();
     FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruction(&eraseBuffer) != 0)
+    if (FLASH_QSPIInstruct(&eraseBuffer) != 0)
     {
         printf("Error: Failed to erase buffer\r\n");
     }
@@ -367,7 +354,7 @@ void FLASH_EraseBlock(uint16_t blockAddress)
 
     FLASH_AwaitNotBusy();
     FLASH_WriteEnable();
-    if (FLASH_QSPIInstruction(&eraseBlock) != 0)
+    if (FLASH_QSPIInstruct(&eraseBlock) != 0)
     {
         printf("Error: Failed to erase block\r\n");
     }
@@ -380,7 +367,7 @@ void FLASH_ResetDeviceSoftware(void)
     FlashInstruction resetSoftware = {.opCode = RESET_DEVICE};
 
     FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruction(&resetSoftware) != 0)
+    if (FLASH_QSPIInstruct(&resetSoftware) != 0)
     {
         printf("Failed to reset software\r\n");
     }

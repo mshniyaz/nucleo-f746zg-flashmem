@@ -1,11 +1,11 @@
 /*
- * test.c
+ * cli.c
  *
- *  Created on: Dec 16, 2024
- *      Author: niyaz
+ * Contains code to run the CLI, including interrupt driven UART inputs.
+ * Also contains functions to parse and run commands inputted by user
  */
 
-#include "flash.h"
+#include "flash-spi.h"
 
 //! Macros for CRC codes of different commands
 #define HELP_CMD 0x8875cac

@@ -22,6 +22,9 @@
 #define WRITE_REGISTER 0x01
 #define READ_PAGE 0x13
 #define READ_BUFFER 0x03
+#define FAST_READ_BUFFER 0x0B
+#define FAST_DUAL_READ_BUFFER 0x3B
+#define FAST_QUAD_READ_BUFFER 0x6B
 #define WRITE_ENABLE 0x06
 #define WRITE_DISABLE 0x04
 #define WRITE_BUFFER 0x84
@@ -32,9 +35,8 @@
 #define RESET_DEVICE 0xFF
 
 // TODO: Impelement below instructions
-#define FAST_READ_BUFFER 0x0B
-#define FAST_DUAL_READ_BUFFER 0x3B
-#define FAST_QUAD_READ_BUFFER 0x6B
+#define FAST_DUAL_READ_IO 0xBB
+#define FAST_QUAD_READ_IO 0xEB
 
 // Addresses of 3 status registers
 #define REGISTER_ONE 0xA0
@@ -99,7 +101,7 @@ extern osMessageQueueId_t cmdParamQueueHandle;
 
 //! Memory management functions
 // General QSPI Instructions
-int FLASH_QSPIInstruction(FlashInstruction *instruction);
+int FLASH_QSPIInstruct(FlashInstruction *instruction);
 
 // Register management functions
 uint8_t FLASH_ReadRegister(int registerNo);
@@ -112,7 +114,9 @@ void FLASH_ReadJEDECID(void);
 void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 void FLASH_ReadPage(uint32_t pageAddress);
 
 // Write Functions
