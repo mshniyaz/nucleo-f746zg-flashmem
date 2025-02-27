@@ -186,7 +186,7 @@ void FLASH_RunCommand(char *cmdStr)
         osMessageQueuePut(cmdParamQueueHandle, &testPageAddress, 0, 0);
 
         // Create a new thread to run the register-test command
-        const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
+        const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 3000 * 4};
         if (osThreadNew(FLASH_TestDataCmd, NULL, &dataTaskAttr) == NULL)
         {
             printf("Failed to generate data-test task\r\n");

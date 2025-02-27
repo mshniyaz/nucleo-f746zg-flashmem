@@ -89,7 +89,7 @@ uint8_t FLASH_ReadRegister(int registerNo)
     if (FLASH_QSPIInstruct(&readRegister) != 0)
     {
         printf("Error: Failed to read register %u\r\n", registerNo);
-        return;
+        return UINT8_MAX;
     }
 
     return registerResponse;
@@ -125,6 +125,12 @@ bool FLASH_IsWEL(void)
 bool FLASH_IsBusy(void)
 {
     uint8_t statusRegister = FLASH_ReadRegister(3);
+    // Handle register read error
+    if (statusRegister == UINT8_MAX)
+    {
+        return true; // Assume busy
+    }
+
     return statusRegister & 1; // Busy bit is last bit
 }
 

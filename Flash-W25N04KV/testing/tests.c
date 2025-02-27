@@ -59,7 +59,6 @@ void FLASH_GetHelpCmd(void)
 // Sequentially erases all blocks
 void FLASH_ResetDeviceCmd(void)
 {
-    osDelay(10); // TODO: Check if buffer time before test begins is necessary
     printf("\r\nPerforming software and data reset...\r\n");
     FLASH_ResetDeviceSoftware();
     FLASH_EraseDevice();
@@ -71,7 +70,7 @@ void FLASH_ResetDeviceCmd(void)
 // Perform sequence to test registers
 void FLASH_TestRegistersCmd(void)
 {
-    osDelay(10); // TODO: Check if buffer time before test begins is necessary
+    errCode = 0; // Set error flag to default
     printf("\r\nTesting flash's register values and functionality\r\n\n");
 
     // Check values of each register
@@ -102,7 +101,6 @@ void FLASH_TestRegistersCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed\r\n");
     }
-    errCode = 0;    // Set error flag to default
     osThreadExit(); // Safely exit thread
 }
 
@@ -112,7 +110,7 @@ void FLASH_TestDataCmd(void)
     // Fetch parameters from queue
     uint32_t testPageAddress;
     osMessageQueueGet(cmdParamQueueHandle, &testPageAddress, NULL, 0);
-    osDelay(10); // TODO: Check if buffer time before test begins is necessary
+    errCode = 0; // Set error flag to default
     printf("\r\nTesting read, write, and erase functionality around page %u\r\n\n", testPageAddress);
 
     // Data buffers
@@ -175,7 +173,6 @@ void FLASH_TestDataCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed, ensure tested blocks are empty\r\n");
     }
-    errCode = 0;    // Set error flag to default
     osThreadExit(); // Safely exit thread
 }
 
@@ -204,7 +201,7 @@ void FLASH_TestHeadTailCmd(void)
         0x05, 0x75, 0x96, 0xD0, 0xF1, 0xAD, 0x62, 0x58, 0x8B, 0x5F, 0xFC, 0xDB, 0xE7, 0x8A, 0x51, 0x59, 0x83, 0x7A,
         0xB2, 0x29, 0x62, 0xC0, 0xFB, 0x71, 0xA1, 0x99, 0x84, 0x25, 0xB8, 0x11, 0x48, 0x4A};
     CircularBuffer buf = {0, 0};
-    osDelay(10); // TODO: Check if buffer time before test begins is necessary
+    errCode = 0; // Set error flag to default
     printf("\r\nTesting flash's detection of circular buffer head & tail\r\n\n");
 
     // Packets to contiguous locations in page 0
@@ -242,6 +239,5 @@ void FLASH_TestHeadTailCmd(void)
     {
         printf("\r\n[FAILED] Some tests failed, circular buffer not working properly\r\n");
     }
-    errCode = 0;    // Set error flag to default
     osThreadExit(); // Safely exit thread
 }

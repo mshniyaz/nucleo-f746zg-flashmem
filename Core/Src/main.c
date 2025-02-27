@@ -241,7 +241,7 @@ static void MX_QUADSPI_Init(void)
     /* USER CODE END QUADSPI_Init 1 */
     /* QUADSPI parameter configuration*/
     hqspi.Instance = QUADSPI;
-    hqspi.Init.ClockPrescaler = 128;
+    hqspi.Init.ClockPrescaler = 3;
     hqspi.Init.FifoThreshold = 1;
     hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_HALFCYCLE;
     hqspi.Init.FlashSize = 28;
@@ -274,7 +274,7 @@ static void MX_USART3_UART_Init(void)
 
     /* USER CODE END USART3_Init 1 */
     huart3.Instance = USART3;
-    huart3.Init.BaudRate = 115200;
+    huart3.Init.BaudRate = 2000000;
     huart3.Init.WordLength = UART_WORDLENGTH_8B;
     huart3.Init.StopBits = UART_STOPBITS_1;
     huart3.Init.Parity = UART_PARITY_NONE;
@@ -493,6 +493,7 @@ void listenCommands(void *argument)
 }
 
 /**
+ * @brief  Period elapsed callback in non blocking mode
  * @note   This function is called  when TIM6 interrupt took place, inside
  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
  * a global variable "uwTick" used as application time base.
