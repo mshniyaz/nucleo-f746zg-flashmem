@@ -142,6 +142,7 @@ void FLASH_AwaitNotBusy(void)
     {
         // TODO: Is constant polling like this ok? Is it blocking?
         // Delay till BUSY bit is 0
+        continue;
     }
 
     return;

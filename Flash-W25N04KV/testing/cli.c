@@ -11,7 +11,14 @@
 #define HELP_CMD 0x8875cac
 #define RESET_DEVICE_CMD 0xa730c915
 #define REGISTER_TEST_CMD 0x8f0add03
+
 #define DATA_TEST_CMD 0xe0220641
+#define DUAL_LINE_SUBCMD 0xffd86266
+#define DUAL_IO_SUBCMD 0x357f4428
+#define QUAD_LINE_SUBCMD 0x96c44df9
+#define QUAD_IO_SUBCMD 0xc52ddfae
+// dual-line, dual-io, quad-line, quad-io
+
 #define HEAD_TAIL_TEST 0x84c67266
 
 //! Utility functions
@@ -58,7 +65,7 @@ bool isAllSpaces(char *str)
     return true;
 }
 
-// Implementation of CRC32b
+// Implementation of CRC32b (LSB first)
 uint32_t crc32(const char *s, uint32_t n)
 {
     uint32_t crc = 0xFFFFFFFF;
@@ -175,29 +182,42 @@ void FLASH_RunCommand(char *cmdStr)
         break;
     case DATA_TEST_CMD:
         // Default parameter values
-        uint32_t linesUsed = 1;
-        uint32_t multilineAddress = 0;
+        uint32_t testTypeHash, linesUsed, multilineAddress;
         uint32_t testPageAddress = 0; //! This parameter is left as default
 
         // Parse the params
         if (paramCount >= 1)
         {
-            uint32_t lineRange[] = {1, 4};
-            parseParamAsInt(params[0], &linesUsed, lineRange);
-            if (linesUsed == 3)
+            testTypeHash = crc32(params[0], strlen(params[0]));
+            // Determine actual params based on hash
+            switch (testTypeHash)
             {
-                linesUsed = 1; // Handle invalid value
+            case DUAL_LINE_SUBCMD:
+                linesUsed = 2;
+                multilineAddress = false;
+                break;
+            case DUAL_IO_SUBCMD:
+                linesUsed = 2;
+                multilineAddress = true;
+                break;
+            case QUAD_LINE_SUBCMD:
+                linesUsed = 4;
+                multilineAddress = false;
+                break;
+            case QUAD_IO_SUBCMD:
+                linesUsed = 4;
+                multilineAddress = true;
+                break;
+            default:
+                linesUsed = 1;
+                multilineAddress = false;
+                break;
             }
         }
-        if (paramCount >= 2)
-        {
-            uint32_t multiAddressRange[] = {0, 1}; // Boolean value
-            parseParamAsInt(params[1], &multilineAddress, multiAddressRange);
-        }
-        // if (paramCount >= 3)
+        // if (paramCount >= 2)
         // {
         //     uint32_t pageRange[] = {1, 262144};
-        //     parseParamAsInt(params[2], &testPageAddress, pageRange);
+        //     parseParamAsInt(params[1], &testPageAddress, pageRange);
         // }
 
         // Enqueue parameters

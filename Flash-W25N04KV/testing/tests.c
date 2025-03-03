@@ -85,12 +85,10 @@ void FLASH_GetHelpCmd(void)
     printf("register-test\r\n");
     printf("Verifies the values and functionality of the flash status registers.\r\n\n");
 
-    printf("data-test [linesUsed] [multilineAddress]\r\n");
-    printf("[linesUsed]: number of QSPI lines used in transmitting or receiving data.\r\n");
-    printf("[multilineAddress]: boolean (1/0), determines whether the address is transmitted multiline\r\n");
-    printf("Note that test involves writing and erasing of page p, p+1, and p+64 (next block), where p is 0 by "
-           "default\r\n");
-    printf("Last block of a page will not be accepted as a valid input for testPageAddress.\r\n\n");
+    printf("data-test [SPIType]\r\n");
+    printf("[SPIType]: Subcommand, type of SPI to use (dual, dual-io, quad, quad-io),\r\n"
+           "where \"-io\" indicates address is multiline. Uses single line if not provided.\r\n");
+    printf("Tests whether the read, write, and erase functionality of a flash is working");
 
     printf("head-tail-test\r\n");
     printf("Ensures flash is able to correctly detect head and tail of circular data buffer.\r\n\n");
@@ -156,13 +154,15 @@ void FLASH_TestRegistersCmd(void)
 void FLASH_TestDataCmd(void)
 {
     uint32_t startTime = HAL_GetTick();
+    errCode = 0; // Set error flag to default
+
     // Fetch parameters from queue
     uint32_t linesUsed, multilineAddress, testPageAddress;
     osMessageQueueGet(cmdParamQueueHandle, &linesUsed, NULL, 0);
     osMessageQueueGet(cmdParamQueueHandle, &multilineAddress, NULL, 0);
     osMessageQueueGet(cmdParamQueueHandle, &testPageAddress, NULL, 0);
-    errCode = 0; // Set error flag to default
     printf("\r\nTesting read, write, and erase functionality around page %u\r\n", testPageAddress);
+
     // Print out type of test
     char *readType = (linesUsed == 4) ? "Quad" : (linesUsed == 2) ? "Dual" : "Single";
     char *addressType = (linesUsed == 4 && multilineAddress)   ? "Quad"
