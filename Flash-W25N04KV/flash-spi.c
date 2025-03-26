@@ -6,7 +6,7 @@
  * IO2 and IO3 remain unused.
  */
 
-#include "flash-spi.h"
+#include "W25N04KV.h"
 
 //! General Operations
 
@@ -19,26 +19,71 @@ int FLASH_QSPIInstruct(FlashInstruction *instruction)
     sCommand.InstructionMode = QSPI_INSTRUCTION_1_LINE;
     sCommand.Instruction = instruction->opCode;
     sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE; // Alternate bytes (not used)
-    // Set address mode and size (address mode is 1 line by default unless addressSize is 0)
-    sCommand.AddressMode = (instruction->addressSize == NULL)     ? QSPI_ADDRESS_NONE
-                           : (instruction->addressLinesUsed == 1) ? QSPI_ADDRESS_1_LINE
-                           : (instruction->addressLinesUsed == 2) ? QSPI_ADDRESS_2_LINES
-                           : (instruction->addressLinesUsed == 4) ? QSPI_ADDRESS_4_LINES
-                                                                  : QSPI_ADDRESS_1_LINE;
+    // Set address mode and size
+    if (instruction->addressSize == 0)
+    {
+        // No address given
+        sCommand.AddressMode = QSPI_ADDRESS_NONE;
+    }
+    else
+    {
+        // Decide lines to use, 1 by default
+        switch (instruction->addressLinesUsed)
+        {
+        case 2:
+            sCommand.AddressMode = QSPI_ADDRESS_2_LINES;
+            break;
+        case 4:
+            sCommand.AddressMode = QSPI_ADDRESS_4_LINES;
+            break;
+        default:
+            sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
+            break;
+        }
+    }
     sCommand.Address = (instruction->addressSize > 0) ? instruction->address : QSPI_ADDRESS_NONE;
-    sCommand.AddressSize = (instruction->addressSize == 1)   ? QSPI_ADDRESS_8_BITS
-                           : (instruction->addressSize == 2) ? QSPI_ADDRESS_16_BITS
-                           : (instruction->addressSize == 3) ? QSPI_ADDRESS_24_BITS
-                           : (instruction->addressSize == 4) ? QSPI_ADDRESS_32_BITS
-                                                             : QSPI_ADDRESS_NONE;
+    // Convert address size in bytes to bits
+    switch (instruction->addressSize)
+    {
+    case 1:
+        sCommand.AddressSize = QSPI_ADDRESS_8_BITS;
+        break;
+    case 2:
+        sCommand.AddressSize = QSPI_ADDRESS_16_BITS;
+        break;
+    case 3:
+        sCommand.AddressSize = QSPI_ADDRESS_24_BITS;
+        break;
+    case 4:
+        sCommand.AddressSize = QSPI_ADDRESS_32_BITS;
+        break;
+    default:
+        sCommand.AddressSize = QSPI_ADDRESS_NONE;
+        break;
+    }
     // Dummy cycles for operations that require delays at high clock frequencies
     sCommand.DummyCycles = (instruction->dummyClocks != NULL) ? instruction->dummyClocks : 0;
     // Set data mode and size (data mode is 1 line by default unless dataSize is 0)
-    sCommand.DataMode = (instruction->dataSize == NULL)     ? QSPI_DATA_NONE
-                        : (instruction->dataLinesUsed == 1) ? QSPI_DATA_1_LINE
-                        : (instruction->dataLinesUsed == 2) ? QSPI_DATA_2_LINES
-                        : (instruction->dataLinesUsed == 4) ? QSPI_DATA_4_LINES
-                                                            : QSPI_DATA_1_LINE;
+    if (instruction->dataSize == 0)
+    {
+        sCommand.DataMode = QSPI_DATA_NONE;
+    }
+    else
+    {
+        // Decide lines to use, 1 by default
+        switch (instruction->dataLinesUsed)
+        {
+        case 2:
+            sCommand.DataMode = QSPI_DATA_2_LINES;
+            break;
+        case 4:
+            sCommand.DataMode = QSPI_DATA_4_LINES;
+            break;
+        default:
+            sCommand.DataMode = QSPI_DATA_1_LINE;
+            break;
+        }
+    }
     sCommand.NbData = instruction->dataSize;
 
     // Send command
@@ -156,7 +201,6 @@ void FLASH_ReadJEDECID(void)
     uint8_t jedecResponse[3] = {0}; // Buffer to hold 3 byte ID (0xEFAA23)
     FlashInstruction readJEDEC = {
         .opCode = GET_JEDEC,
-        .address = NULL,
         .dummyClocks = 8,
         .dataMode = RECEIVE,
         .dataBuf = jedecResponse,

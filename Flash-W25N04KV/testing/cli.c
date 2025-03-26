@@ -5,7 +5,8 @@
  * Also contains functions to parse and run commands inputted by user
  */
 
-#include "flash-spi.h"
+#include "W25N04KV.h"
+#include "cli.h"
 
 //! Macros for CRC codes of different commands
 #define HELP_CMD 0x8875cac
@@ -17,20 +18,18 @@
 #define DUAL_IO_SUBCMD 0x357f4428
 #define QUAD_LINE_SUBCMD 0x96c44df9
 #define QUAD_IO_SUBCMD 0xc52ddfae
-// dual-line, dual-io, quad-line, quad-io
 
 #define HEAD_TAIL_TEST 0x84c67266
 
 //! Utility functions
 
-// Parses parameters into unsigned integers, clamping them into a given range. Invalid inputs are ignored.
+// Parses parameters into unsigned integers, clamping them into a given range.
+// Invalid inputs are ignored.
 void parseParamAsInt(char *paramStr, uint32_t *paramPtr, uint32_t range[2])
 {
     // Check if string exists
     if (paramStr == NULL)
-    {
         return;
-    }
 
     // Parse using stroul, invalid conversions result in 0
     char *endptr;
@@ -39,7 +38,9 @@ void parseParamAsInt(char *paramStr, uint32_t *paramPtr, uint32_t range[2])
     // Check for invalid input or out-of-range values
     if (*endptr != '\0' || result >= UINT32_MAX)
     {
-        printf("Parameter '%s' is invalid, expected a non-negative number within range\r\n", paramStr);
+        printf("Parameter '%s' is invalid, expected a non-negative number within "
+               "range\r\n",
+               paramStr);
         return;
     }
 
@@ -56,9 +57,7 @@ bool isAllSpaces(char *str)
     while (*str != '\0')
     {
         if (*str != ' ')
-        {
             return false;
-        }
         str++;
     }
 
@@ -87,14 +86,14 @@ uint32_t crc32(const char *s, uint32_t n)
 }
 
 //! CLI functions
-volatile uint8_t receivedByte;
-volatile uint8_t cmdIndex = 0;
-volatile char cmdBuf[MAX_CMD_LENGTH];
+uint8_t receivedByte; // Tracks last inputted UART byte
+uint8_t cmdIndex = 0;
+char cmdBuf[MAX_CMD_LENGTH];
 
 // UART receive callback function for interrupt-driven polling
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (receivedByte == 0x0D) // Enter
+    if (receivedByte == '\n' || receivedByte == '\r')
     {
         // Null terminate and send command to queue
         cmdBuf[cmdIndex] = '\0';
@@ -103,7 +102,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         // Reset input tracking to prep for next command input
         cmdIndex = 0;
     }
-    else if (receivedByte == 0x08) // Backspace
+    else if (receivedByte == '\b')
     {
         if (cmdIndex > 0)
         {
@@ -129,7 +128,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void FLASH_ListenCommands(void)
 {
     printf("cmd: ");
-    HAL_UART_Receive_IT(&huart3, &receivedByte, 1); // Start receiving the first byte
+    HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
 }
 
 // Parses and runs given command
@@ -168,17 +167,13 @@ void FLASH_RunCommand(char *cmdStr)
         // Create a new thread to run the reset-device command
         const osThreadAttr_t resetTaskAttr = {.priority = osPriorityHigh};
         if (osThreadNew(FLASH_ResetDeviceCmd, NULL, &resetTaskAttr) == NULL)
-        {
             printf("Failed to generate reset-device thread\r\n");
-        }
         break;
     case REGISTER_TEST_CMD:
         // Create a new thread to run the register-test command
         const osThreadAttr_t registerTaskAttr = {.priority = osPriorityHigh, .stack_size = 512 * 4};
         if (osThreadNew(FLASH_TestRegistersCmd, NULL, &registerTaskAttr) == NULL)
-        {
             printf("Failed to generate register-test task\r\n");
-        }
         break;
     case DATA_TEST_CMD:
         // Default parameter values
@@ -228,17 +223,13 @@ void FLASH_RunCommand(char *cmdStr)
         // Create a new thread to run the register-test command
         const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 3000 * 4};
         if (osThreadNew(FLASH_TestDataCmd, NULL, &dataTaskAttr) == NULL)
-        {
             printf("Failed to generate data-test task\r\n");
-        }
         break;
     case HEAD_TAIL_TEST:
         // Craete a new thread to run the head-tail-test command
         const osThreadAttr_t headTailTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
         if (osThreadNew(FLASH_TestHeadTailCmd, NULL, &headTailTaskAttr) == NULL)
-        {
             printf("Failed to generate head-tail-test task\r\n");
-        }
         break;
     default:
         printf("Invalid Command \"%s\" (CRC32: 0x%x)\r\n", cmdStr, cmdHash);

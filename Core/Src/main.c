@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <flash-spi.h>
+#include <W25N04KV.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

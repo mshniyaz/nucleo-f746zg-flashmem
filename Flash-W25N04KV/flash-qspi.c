@@ -5,7 +5,7 @@
  * or receive data on all 4 lines (IO0 to IO3).
  */
 
-#include "flash-spi.h"
+#include "W25N04KV.h"
 
 //! Read instructions
 

@@ -1,21 +1,24 @@
 /*
  * tests.c
  *
- * Contains code which runs each test. The tests accept parameters
- * placed in cmdParamQueue by the function calling the test.
+ * Contains code which runs each test. Note that each test is a FreeRTOS task.
+ * The tests accept parameters placed in cmdParamQueue by the function calling the test.
+ * All tests should terminate themselves once complete.
  */
 
-#include "flash-spi.h"
+#include "W25N04KV.h"
+#include "cli.h"
 
-// Custom assert macro to handle errors
-#define ASSERT(condition, message)                                                                                     \
+// Custom assert macro to handle errors without program exit
+// NOTE: An error boolean variable must be defined prior to assert usage
+#define ASSERT(condition, errMessage)                                                                                  \
     do                                                                                                                 \
     {                                                                                                                  \
         if (!(condition))                                                                                              \
         {                                                                                                              \
-            printf("[ERROR] %s\r\n\n", message);                                                                       \
+            printf("[ERROR] %s\r\n\n", errMessage);                                                                    \
             printf("Test Failed: %s (File: %s, Line: %d)\r\n", #condition, __FILE__, __LINE__);                        \
-            errCode = 1;                                                                                               \
+            error = true;                                                                                              \
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
@@ -67,9 +70,6 @@ void FLASH_GenericWrite(uint8_t *data, uint16_t size, uint16_t columnAddress, ui
     }
 }
 
-// Flag to track if a test throws an error
-static int errCode = 0;
-
 // Print list of commands
 void FLASH_GetHelpCmd(void)
 {
@@ -102,11 +102,11 @@ void FLASH_GetHelpCmd(void)
 // Sequentially erases all blocks
 void FLASH_ResetDeviceCmd(void)
 {
-    uint32_t startTime = HAL_GetTick();
+    uint32_t startTime = xTaskGetTickCount();
     printf("\r\nPerforming software and data reset...\r\n");
     FLASH_ResetDeviceSoftware();
     FLASH_EraseDevice();
-    printf("Reset complete, time taken: %ums\r\n", HAL_GetTick() - startTime);
+    printf("Reset complete, time taken: %ums\r\n", xTaskGetTickCount() - startTime);
 
     osThreadExit(); // Safely exit thread
 }
@@ -114,8 +114,8 @@ void FLASH_ResetDeviceCmd(void)
 // Perform sequence to test registers
 void FLASH_TestRegistersCmd(void)
 {
-    uint32_t startTime = HAL_GetTick();
-    errCode = 0; // Set error flag to default
+    uint32_t startTime = xTaskGetTickCount();
+    bool error = false; // Set error flag to default
     printf("\r\nTesting flash's register values and functionality\r\n\n");
 
     // Check values of each register
@@ -138,23 +138,19 @@ void FLASH_TestRegistersCmd(void)
     osDelay(10); // Ensure erase properly terminates
     ASSERT(FLASH_ReadRegister(3) == 0, "WEL and BUSY bits not cleared after erase operation");
 
-    if (errCode == 0)
-    {
+    if (!error)
         printf("\r\n[PASSED] All registers configured correctly\r\n");
-    }
     else
-    {
         printf("\r\n[FAILED] Some tests failed\r\n");
-    }
-    printf("Time taken: %ums", HAL_GetTick() - startTime);
+    printf("Time taken: %ums\r\n", xTaskGetTickCount() - startTime);
     osThreadExit(); // Safely exit thread
 }
 
 // Performs sequence to test buffer, read, writes, and erase
 void FLASH_TestDataCmd(void)
 {
-    uint32_t startTime = HAL_GetTick();
-    errCode = 0; // Set error flag to default
+    uint32_t startTime = xTaskGetTickCount();
+    bool error = false; // Set error flag to default
 
     // Fetch parameters from queue
     uint32_t linesUsed, multilineAddress, testPageAddress;
@@ -223,22 +219,18 @@ void FLASH_TestDataCmd(void)
     // Erase block containing testPageAddress+64 to prep for next test
     FLASH_EraseBlock((testPageAddress / 64) + 1);
 
-    if (errCode == 0)
-    {
+    if (!error)
         printf("\r\n[PASSED] Data tests completed successfully\r\n");
-    }
     else
-    {
         printf("\r\n[FAILED] Some tests failed, ensure tested blocks are empty\r\n");
-    }
-    printf("Time taken: %ums", HAL_GetTick() - startTime);
+    printf("Time taken: %ums\r\n", xTaskGetTickCount() - startTime);
     osThreadExit(); // Safely exit thread
 }
 
 // Test if the flash memory is able to find head and tail given data with gaps
 void FLASH_TestHeadTailCmd(void)
 {
-    uint32_t startTime = HAL_GetTick();
+    uint32_t startTime = xTaskGetTickCount();
     // Data read buffer and test Packet
     uint8_t testPacket[338] = {
         0x45, 0x8D, 0x35, 0x92, 0x3C, 0xA4, 0x1D, 0xC4, 0x79, 0xEB, 0x41, 0x5F, 0x4B, 0xB4, 0xCC, 0x49, 0x02, 0x53,
@@ -261,7 +253,7 @@ void FLASH_TestHeadTailCmd(void)
         0x05, 0x75, 0x96, 0xD0, 0xF1, 0xAD, 0x62, 0x58, 0x8B, 0x5F, 0xFC, 0xDB, 0xE7, 0x8A, 0x51, 0x59, 0x83, 0x7A,
         0xB2, 0x29, 0x62, 0xC0, 0xFB, 0x71, 0xA1, 0x99, 0x84, 0x25, 0xB8, 0x11, 0x48, 0x4A};
     CircularBuffer buf = {0, 0};
-    errCode = 0; // Set error flag to default
+    bool error = false; // Set error flag to default
     printf("\r\nTesting flash's detection of circular buffer head & tail\r\n\n");
 
     // Packets to contiguous locations in page 0
@@ -291,15 +283,10 @@ void FLASH_TestHeadTailCmd(void)
     // Erase block where test was conducted to prep for next test
     FLASH_EraseBlock(0);
 
-    if (errCode == 0)
-    {
+    if (!error)
         printf("\r\n[PASSED] Head and tail tests completed successfully\r\n");
-    }
     else
-    {
         printf("\r\n[FAILED] Some tests failed, circular buffer not working properly\r\n");
-    }
-
-    printf("Time taken: %ums", HAL_GetTick() - startTime);
+    printf("Time taken: %ums\r\n", xTaskGetTickCount() - startTime);
     osThreadExit(); // Safely exit thread
 }
