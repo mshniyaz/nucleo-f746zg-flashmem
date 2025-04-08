@@ -111,114 +111,114 @@ union PageStructure {
 //! QSPI, UART, and queue handling types, must be defined in main.c
 extern QSPI_HandleTypeDef hqspi;
 extern UART_HandleTypeDef huart3;
-extern osMessageQueueId_t uartQueueHandle;
-extern osMessageQueueId_t cmdParamQueueHandle;
+extern osMessageQueueId_t uartQueueHandle; // Size of 64 bytes, where each item is 64 bytes
+extern osMessageQueueId_t cmdParamQueueHandle; // Size of 8 bytes, where each item is 4 bytes (uint32_t), 2 params max
 
 /// @brief Issues an instruction via the QSPI peropheral
 /// @param instruction A struct containing the data of the instruction to be sent
 /// @return An error code, 0 if successful and 1 if failed
-int FLASH_QSPIInstruct(FlashInstruction *instruction);
+int W25N04KV_QSPIInstruct(FlashInstruction *instruction);
 
 /// @brief Reads the value of a specified register.
 /// @param registerNo The register which is read (either 1, 2, or 3).
 /// @return The value of the register. If the register fails to be read, UINT8_MAX is returned.
-uint8_t FLASH_ReadRegister(int registerNo);
+uint8_t W25N04KV_ReadRegister(int registerNo);
 
 /// @brief Resets the flash memory device using a software reset command. Data stored should remain unaffected.
-void FLASH_ResetDeviceSoftware(void);
+void W25N04KV_ResetDeviceSoftware(void);
 
 /// @brief Fetches the value of the write enable latch (WEL) of the flash.
 /// @return The value of the WEL bit, true if set and false if not.
-bool FLASH_IsWEL(void);
+bool W25N04KV_IsWEL(void);
 
 /// @brief Fetches the value of the BUSY bit of the flash.
 /// @return The value of the BUSY bit, true if set and false if not.
-bool FLASH_IsBusy(void);
+bool W25N04KV_IsBusy(void);
 
 /// @brief Reads and prints the JEDEC ID of the flash via UART
-void FLASH_ReadJEDECID(void);
+void W25N04KV_ReadJEDECID(void);
 
 /// @brief Reads data from the flash memory's data buffer, starting at the specified column address and storing the read
 /// data.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
-/// @brief Reads data from the flash memory's data buffer. Functionally the same as FLASH_ReadBuffer for this flash, but
-/// may give access to higher clock rates in other WinBond flash devices.
+/// @brief Reads data from the flash memory's data buffer. Functionally the same as W25N04KV_ReadBuffer for this flash,
+/// but may give access to higher clock rates in other WinBond flash devices.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 /// @brief Reads data from the flash memory's data buffer using 2 lines (IO0 and IO1), but sends address on IO0 only.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 /// @brief Reads data from the flash memory's data buffer using 2 lines (IO0 and IO1), also sending the address on 2
 /// lines.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 /// @brief Reads data from the flash memory's data buffer using 4 lines (IO0-IO3), but sends address on IO0 only.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 /// @brief Reads data from the flash memory's data buffer using 4 lines (IO0-IO3), also sending the address on 4 lines.
 /// @param columnAddress The starting column address.
 /// @param size The number of bytes to read.
 /// @param readResponse Pointer to the buffer to store the read data.
-void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
+void W25N04KV_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse);
 
 /// @brief Reads an entire page of data from the specified page address into the data buffer.
 /// @param pageAddress The address of the page to read, from 0 to 262143.
-void FLASH_ReadPage(uint32_t pageAddress);
+void W25N04KV_ReadPage(uint32_t pageAddress);
 
 /// @brief Enables write operations for the flash memory, setting the Write Enable Latch (WEL) bit to 1.
-void FLASH_WriteEnable(void);
+void W25N04KV_WriteEnable(void);
 
 /// @brief Disables write operations for the flash memory, setting the Write Enable Latch (WEL) bit to 0.
-void FLASH_WriteDisable(void);
+void W25N04KV_WriteDisable(void);
 
 /// @brief Writes data into the data buffer at the specified column address. Data exceeding the buffer size is
 /// discarded.
 /// @param data Pointer to the buffer containing the data to write.
 /// @param size The number of bytes to write.
 /// @param columnAddress The starting column address.
-void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
+void W25N04KV_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 
 /// @brief Writes data into the data buffer at the specified column address using 4 lines. Data exceeding the buffer
 /// size is discarded.
 /// @param data Pointer to the buffer containing the data to write.
 /// @param size The number of bytes to write.
 /// @param columnAddress The starting column address.
-void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
+void W25N04KV_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress);
 
 /// @brief Commits the data written to the buffer to the specified page address.
 /// @param pageAddress The address of the page to write to, between 0 and 262143.
-void FLASH_WriteExecute(uint32_t pageAddress);
+void W25N04KV_WriteExecute(uint32_t pageAddress);
 
 /// @brief Erases the data buffer, setting all bytes to 0xFF.
-void FLASH_EraseBuffer(void);
+void W25N04KV_EraseBuffer(void);
 
 /// @brief Erases a specific block in the flash memory.
 /// @param blockAddress The address of the block to erase, between 0 and 4095.
-void FLASH_EraseBlock(uint16_t blockAddress);
+void W25N04KV_EraseBlock(uint16_t blockAddress);
 
 /// @brief Performs a full device erase, clearing all data in the main data array.
-void FLASH_EraseDevice(void);
+void W25N04KV_EraseDevice(void);
 
 /// @brief Finds the head and tail positions in a circular buffer within the specified page range.
 /// @param buf Pointer to the circular buffer struct.
 /// @param pageRange Array of two uint8_t values representing the start and end of the page range to search for head and
 /// tail.
-void FLASH_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2]);
+void W25N04KV_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2]);
 
 #endif /* FLASH_H_ */

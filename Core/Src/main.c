@@ -48,11 +48,11 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
-/* Definitions for ListenCommands */
-osThreadId_t ListenCommandsHandle;
-const osThreadAttr_t ListenCommands_attributes = {
-    .name = "ListenCommands",
-    .stack_size = 2048 * 4,
+/* Definitions for myTask01 */
+osThreadId_t myTask01Handle;
+const osThreadAttr_t myTask01_attributes = {
+    .name = "myTask01",
+    .stack_size = 256 * 4,
     .priority = (osPriority_t)osPriorityHigh,
 };
 /* Definitions for uartQueue */
@@ -70,7 +70,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_QUADSPI_Init(void);
-void listenCommands(void *argument);
+void startTask01(void *argument);
 
 /* USER CODE BEGIN PFP */
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
@@ -142,10 +142,11 @@ int main(void)
     /* USER CODE END RTOS_QUEUES */
 
     /* Create the thread(s) */
-    /* creation of ListenCommands */
-    ListenCommandsHandle = osThreadNew(listenCommands, NULL, &ListenCommands_attributes);
+    /* creation of myTask01 */
+    myTask01Handle = osThreadNew(startTask01, NULL, &myTask01_attributes);
 
     /* USER CODE BEGIN RTOS_THREADS */
+    xTaskCreate(W25N04KV_InitCLI, "CLI", 2048 * 4, NULL, osPriorityNormal, NULL); // Create the CLI task
     /* add threads, ... */
     /* USER CODE END RTOS_THREADS */
 
@@ -456,38 +457,23 @@ PUTCHAR_PROTOTYPE
 }
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_listenCommands */
+/* USER CODE BEGIN Header_startTask01 */
 /**
- * @brief  Function implementing the ListenCommands thread.
+ * @brief  Function implementing the myTask01 thread.
  * @param  argument: Not used
  * @retval None
  */
-/* USER CODE END Header_listenCommands */
-void listenCommands(void *argument)
+/* USER CODE END Header_startTask01 */
+void startTask01(void *argument)
 {
     /* USER CODE BEGIN 5 */
-    // Quick restart for the flash
-    HAL_Delay(1000);
-    FLASH_ReadJEDECID();
-    FLASH_ResetDeviceSoftware();
-
-    // Begin listening for user input
-    char receivedCommand[64]; // Buffer to track received command
-    FLASH_ListenCommands();
+    vTaskSuspend(NULL); // Suspend the current task indefinitely
 
     /* Infinite loop */
     for (;;)
     {
-        // Wait for command to be shifted into queue
-        if (osMessageQueueGet(uartQueueHandle, receivedCommand, NULL, osWaitForever) == osOK)
-        {
-            FLASH_RunCommand(receivedCommand);
-            FLASH_ListenCommands(); // Restart listening for next command
-        }
+        // We should never reach here
     }
-
-    // In case we accidentally exit from task loop
-    osThreadTerminate(NULL);
     /* USER CODE END 5 */
 }
 

@@ -34,27 +34,27 @@ void FLASH_GenericRead(uint16_t columnAddress, uint16_t size, uint8_t *readRespo
     {
         if (multilineAddress)
         {
-            FLASH_FastDualReadIO(columnAddress, size, readResponse);
+            W25N04KV_FastDualReadIO(columnAddress, size, readResponse);
         }
         else
         {
-            FLASH_FastDualReadBuffer(columnAddress, size, readResponse);
+            W25N04KV_FastDualReadBuffer(columnAddress, size, readResponse);
         }
     }
     else if (linesUsed == 4)
     {
         if (multilineAddress)
         {
-            FLASH_FastQuadReadIO(columnAddress, size, readResponse);
+            W25N04KV_FastQuadReadIO(columnAddress, size, readResponse);
         }
         else
         {
-            FLASH_FastQuadReadBuffer(columnAddress, size, readResponse);
+            W25N04KV_FastQuadReadBuffer(columnAddress, size, readResponse);
         }
     }
     else
     {
-        FLASH_FastReadBuffer(columnAddress, size, readResponse); // Use 1 line by default
+        W25N04KV_FastReadBuffer(columnAddress, size, readResponse); // Use 1 line by default
     }
 }
 
@@ -62,11 +62,11 @@ void FLASH_GenericWrite(uint8_t *data, uint16_t size, uint16_t columnAddress, ui
 {
     if (linesUsed == 4)
     {
-        FLASH_QuadWriteBuffer(data, size, columnAddress);
+        W25N04KV_QuadWriteBuffer(data, size, columnAddress);
     }
     else
     {
-        FLASH_WriteBuffer(data, size, columnAddress); // Use 1 line as default
+        W25N04KV_WriteBuffer(data, size, columnAddress); // Use 1 line as default
     }
 }
 
@@ -100,32 +100,33 @@ void FLASH_GetHelpCmd(void)
 }
 
 // Sequentially erases all blocks
-void FLASH_ResetDeviceCmd(void)
+void W25N04KV_ResetDeviceCmd(void)
 {
     uint32_t startTime = xTaskGetTickCount();
-    printf("\r\nPerforming software and data reset...\r\n");
-    FLASH_ResetDeviceSoftware();
-    FLASH_EraseDevice();
+    printf("Performing software and data reset...\r\n");
+    W25N04KV_ResetDeviceSoftware();
+    W25N04KV_EraseDevice();
     printf("Reset complete, time taken: %ums\r\n", xTaskGetTickCount() - startTime);
 
     osThreadExit(); // Safely exit thread
 }
 
 // Perform sequence to test registers
-void FLASH_TestRegistersCmd(void)
+void W25N04KV_TestRegistersCmd(void)
 {
     uint32_t startTime = xTaskGetTickCount();
     bool error = false; // Set error flag to default
     printf("\r\nTesting flash's register values and functionality\r\n\n");
 
     // Check values of each register
-    ASSERT(FLASH_ReadRegister(1) == 0, "Unexpected protection register value, some memory blocks are still protected");
-    ASSERT(FLASH_ReadRegister(2) == 0x19, "Unexpected configuration register value, configurations are non-default");
-    ASSERT(FLASH_ReadRegister(3) == 0, "Unexpected status register value, possible write program or erase failure");
+    ASSERT(W25N04KV_ReadRegister(1) == 0,
+           "Unexpected protection register value, some memory blocks are still protected");
+    ASSERT(W25N04KV_ReadRegister(2) == 0x19, "Unexpected configuration register value, configurations are non-default");
+    ASSERT(W25N04KV_ReadRegister(3) == 0, "Unexpected status register value, possible write program or erase failure");
 
     // Check if WEL bit can be set
-    FLASH_WriteEnable();
-    ASSERT(FLASH_ReadRegister(3) == 2, "Failed to set WEL bit in status register");
+    W25N04KV_WriteEnable();
+    ASSERT(W25N04KV_ReadRegister(3) == 2, "Failed to set WEL bit in status register");
 
     // Check if BUSY bit correctly sets during erase
     FlashInstruction eraseBlock = {
@@ -133,10 +134,10 @@ void FLASH_TestRegistersCmd(void)
         .address = 0,
         .addressSize = 3,
     };
-    FLASH_QSPIInstruct(&eraseBlock);
-    ASSERT(FLASH_IsBusy() == true, "Failed to set BUSY bit in status register during erase operation");
+    W25N04KV_QSPIInstruct(&eraseBlock);
+    ASSERT(W25N04KV_IsBusy() == true, "Failed to set BUSY bit in status register during erase operation");
     osDelay(10); // Ensure erase properly terminates
-    ASSERT(FLASH_ReadRegister(3) == 0, "WEL and BUSY bits not cleared after erase operation");
+    ASSERT(W25N04KV_ReadRegister(3) == 0, "WEL and BUSY bits not cleared after erase operation");
 
     if (!error)
         printf("\r\n[PASSED] All registers configured correctly\r\n");
@@ -147,7 +148,7 @@ void FLASH_TestRegistersCmd(void)
 }
 
 // Performs sequence to test buffer, read, writes, and erase
-void FLASH_TestDataCmd(void)
+void W25N04KV_TestDataCmd(void)
 {
     uint32_t startTime = xTaskGetTickCount();
     bool error = false; // Set error flag to default
@@ -183,41 +184,41 @@ void FLASH_TestDataCmd(void)
            "Failed to read data buffer correctly at a non-zero bit address");
 
     // Execute write to first 4 bytes of page testPageAddress, testPageAddress+1, testPageAddress+64
-    FLASH_WriteExecute(testPageAddress);
+    W25N04KV_WriteExecute(testPageAddress);
     FLASH_GenericWrite(testData, 4, 0, linesUsed);
-    FLASH_WriteExecute(testPageAddress + 1);
+    W25N04KV_WriteExecute(testPageAddress + 1);
     FLASH_GenericWrite(testData, 4, 0, linesUsed);
-    FLASH_WriteExecute(testPageAddress + 64);
+    W25N04KV_WriteExecute(testPageAddress + 64);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress); // Expect empty buffer after write execute
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Buffer fails to flush data when writing to a page");
 
     // Reads page testPageAddress, expects buffer to be full
-    FLASH_ReadPage(testPageAddress);
+    W25N04KV_ReadPage(testPageAddress);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, testData, 4) == 0, "Failed to write to page and read it into data buffer");
 
     // Reads page testPageAddress+2, expects buffer to be empty
-    FLASH_ReadPage(testPageAddress + 2);
+    W25N04KV_ReadPage(testPageAddress + 2);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Never wrote to page but it is non-empty");
 
     // Check that block with testPageAddress is properly erased
-    FLASH_EraseBlock(testPageAddress / 64);
-    FLASH_ReadPage(testPageAddress);
+    W25N04KV_EraseBlock(testPageAddress / 64);
+    W25N04KV_ReadPage(testPageAddress);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Failed to erase block");
 
-    FLASH_ReadPage(testPageAddress + 1);
+    W25N04KV_ReadPage(testPageAddress + 1);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, emptyResponse, 4) == 0, "Failed to erase block");
 
     // Check that page testPageAddress+64 is not erased
-    FLASH_ReadPage(testPageAddress + 64);
+    W25N04KV_ReadPage(testPageAddress + 64);
     FLASH_GenericRead(0, 4, readResponse, linesUsed, multilineAddress);
     ASSERT(memcmp(readResponse, testData, 4) == 0, "Page was erroneously erased");
 
     // Erase block containing testPageAddress+64 to prep for next test
-    FLASH_EraseBlock((testPageAddress / 64) + 1);
+    W25N04KV_EraseBlock((testPageAddress / 64) + 1);
 
     if (!error)
         printf("\r\n[PASSED] Data tests completed successfully\r\n");
@@ -228,7 +229,7 @@ void FLASH_TestDataCmd(void)
 }
 
 // Test if the flash memory is able to find head and tail given data with gaps
-void FLASH_TestHeadTailCmd(void)
+void W25N04KV_TestHeadTailCmd(void)
 {
     uint32_t startTime = xTaskGetTickCount();
     // Data read buffer and test Packet
@@ -257,31 +258,31 @@ void FLASH_TestHeadTailCmd(void)
     printf("\r\nTesting flash's detection of circular buffer head & tail\r\n\n");
 
     // Packets to contiguous locations in page 0
-    FLASH_WriteBuffer(testPacket, 338, 0);
-    FLASH_WriteBuffer(testPacket, 338, 338);
-    FLASH_WriteBuffer(testPacket, 338, 338 * 2);
-    FLASH_WriteExecute(0);
-    FLASH_FindHeadTail(&buf, (uint8_t[]){0, 3});
+    W25N04KV_WriteBuffer(testPacket, 338, 0);
+    W25N04KV_WriteBuffer(testPacket, 338, 338);
+    W25N04KV_WriteBuffer(testPacket, 338, 338 * 2);
+    W25N04KV_WriteExecute(0);
+    W25N04KV_FindHeadTail(&buf, (uint8_t[]){0, 3});
     ASSERT((buf.head == 0 && buf.tail == 1014), "Failed to detect head and tail of contiguous packets in page 0");
 
     // Packets to contiguous locations in page 1, starting at non-zero position
-    FLASH_EraseBlock(0);
-    FLASH_WriteBuffer(testPacket, 338, 338);
-    FLASH_WriteBuffer(testPacket, 338, 338 * 2);
-    FLASH_WriteBuffer(testPacket, 338, 338 * 3);
-    FLASH_WriteExecute(1);
-    FLASH_FindHeadTail(&buf, (uint8_t[]){0, 3});
+    W25N04KV_EraseBlock(0);
+    W25N04KV_WriteBuffer(testPacket, 338, 338);
+    W25N04KV_WriteBuffer(testPacket, 338, 338 * 2);
+    W25N04KV_WriteBuffer(testPacket, 338, 338 * 3);
+    W25N04KV_WriteExecute(1);
+    W25N04KV_FindHeadTail(&buf, (uint8_t[]){0, 3});
     ASSERT((buf.head == 2386 && buf.tail == 3400), "Failed to detect head and tail of contiguous packets in page 1");
 
     // Additional packet at end of page 2, non-contiguous buffer
-    FLASH_WriteBuffer(testPacket, 338, 338 * 4);
-    FLASH_WriteExecute(2);
-    FLASH_FindHeadTail(&buf, (uint8_t[]){0, 3});
+    W25N04KV_WriteBuffer(testPacket, 338, 338 * 4);
+    W25N04KV_WriteExecute(2);
+    W25N04KV_FindHeadTail(&buf, (uint8_t[]){0, 3});
     ASSERT((buf.head == 2386 && buf.tail == 5786),
            "Failed to detect head and tail of non-contiguous packets in page 1 & 2");
 
     // Erase block where test was conducted to prep for next test
-    FLASH_EraseBlock(0);
+    W25N04KV_EraseBlock(0);
 
     if (!error)
         printf("\r\n[PASSED] Head and tail tests completed successfully\r\n");

@@ -11,7 +11,7 @@
 //! General Operations
 
 // Issues a command to the flash via QSPI
-int FLASH_QSPIInstruct(FlashInstruction *instruction)
+int W25N04KV_QSPIInstruct(FlashInstruction *instruction)
 {
     QSPI_CommandTypeDef sCommand = {0};
 
@@ -119,7 +119,7 @@ int FLASH_QSPIInstruct(FlashInstruction *instruction)
 //! Managing Status Registers
 
 // Reads registers (either 1,2, or 3)
-uint8_t FLASH_ReadRegister(int registerNo)
+uint8_t W25N04KV_ReadRegister(int registerNo)
 {
     uint8_t registerResponse;
     FlashInstruction readRegister = {
@@ -131,7 +131,7 @@ uint8_t FLASH_ReadRegister(int registerNo)
         .dataSize = 1,
     };
 
-    if (FLASH_QSPIInstruct(&readRegister) != 0)
+    if (W25N04KV_QSPIInstruct(&readRegister) != 0)
     {
         printf("Error: Failed to read register %u\r\n", registerNo);
         return UINT8_MAX;
@@ -141,7 +141,7 @@ uint8_t FLASH_ReadRegister(int registerNo)
 }
 
 // Disable write protection for all blocks and registers
-void FLASH_DisableWriteProtect(void)
+void W25N04KV_DisableWriteProtect(void)
 {
     uint8_t registerVal = 0x00; // Set all bits of register 1 to 0
     FlashInstruction disableWriteProtect = {
@@ -153,23 +153,23 @@ void FLASH_DisableWriteProtect(void)
         .dataSize = 1,
     };
 
-    if (FLASH_QSPIInstruct(&disableWriteProtect) != 0)
+    if (W25N04KV_QSPIInstruct(&disableWriteProtect) != 0)
     {
         printf("Error: Failed to disable write protection\r\n");
     }
 }
 
 // Read Write Enable Latch (WEL) Bit
-bool FLASH_IsWEL(void)
+bool W25N04KV_IsWEL(void)
 {
-    uint8_t statusRegister = FLASH_ReadRegister(3);
+    uint8_t statusRegister = W25N04KV_ReadRegister(3);
     return (statusRegister & (1 << 1)) >> 1; // WEL is 2nd last bit
 }
 
 // Read BUSY Bit
-bool FLASH_IsBusy(void)
+bool W25N04KV_IsBusy(void)
 {
-    uint8_t statusRegister = FLASH_ReadRegister(3);
+    uint8_t statusRegister = W25N04KV_ReadRegister(3);
     // Handle register read error
     if (statusRegister == UINT8_MAX)
     {
@@ -180,10 +180,10 @@ bool FLASH_IsBusy(void)
 }
 
 // Wait till BUSY bit is cleared to zero
-void FLASH_AwaitNotBusy(void)
+void W25N04KV_AwaitNotBusy(void)
 {
     // Repeatedly poll busy bit till success
-    while (FLASH_IsBusy())
+    while (W25N04KV_IsBusy())
     {
         // TODO: Is constant polling like this ok? Is it blocking?
         // Delay till BUSY bit is 0
@@ -196,7 +196,7 @@ void FLASH_AwaitNotBusy(void)
 //! Read Operations
 
 // Read JEDEC ID of flash memory
-void FLASH_ReadJEDECID(void)
+void W25N04KV_ReadJEDECID(void)
 {
     uint8_t jedecResponse[3] = {0}; // Buffer to hold 3 byte ID (0xEFAA23)
     FlashInstruction readJEDEC = {
@@ -207,7 +207,7 @@ void FLASH_ReadJEDECID(void)
         .dataSize = 3,
     };
 
-    if (FLASH_QSPIInstruct(&readJEDEC) != 0)
+    if (W25N04KV_QSPIInstruct(&readJEDEC) != 0)
     {
         printf("Error: Failed to send JEDEC ID command\r\n");
         return;
@@ -221,7 +221,7 @@ void FLASH_ReadJEDECID(void)
 }
 
 // Transfers data in a page to the flash memory's data buffer
-void FLASH_ReadPage(uint32_t pageAddress)
+void W25N04KV_ReadPage(uint32_t pageAddress)
 {
     FlashInstruction readPage = {
         .opCode = READ_PAGE,
@@ -229,15 +229,15 @@ void FLASH_ReadPage(uint32_t pageAddress)
         .addressSize = 3,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&readPage) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&readPage) != 0)
     {
         printf("Error: Failed to read page %u\r\n", pageAddress);
     }
 }
 
 // Reads data from the flash memory buffer into the provided buffer `readResponse`
-void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction readBuffer = {
         .opCode = READ_BUFFER,
@@ -249,15 +249,15 @@ void FLASH_ReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRespon
         .dataSize = size,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&readBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&readBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
     }
 }
 
 // Read buffer for higher clock rates, functionally same as normal read for this flash
-void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastReadBuffer = {
         .opCode = FAST_READ_BUFFER,
@@ -269,15 +269,15 @@ void FLASH_FastReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataSize = size,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&fastReadBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&fastReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer\r\n");
     }
 }
 
 // Read buffer on 2 lines
-void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastDualReadBuffer = {
         .opCode = FAST_DUAL_READ_BUFFER,
@@ -290,15 +290,15 @@ void FLASH_FastDualReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *re
         .dataLinesUsed = 2,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&fastDualReadBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&fastDualReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer on 2 lines\r\n");
     }
 }
 
 // Read buffer on 2 lines, also send address on 2 lines
-void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastDualReadIO = {
         .opCode = FAST_DUAL_READ_IO,
@@ -312,8 +312,8 @@ void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataLinesUsed = 2,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&fastDualReadIO) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&fastDualReadIO) != 0)
     {
         printf("Error: Failed to send address and read data buffer on 2 lines\r\n");
     }
@@ -322,29 +322,29 @@ void FLASH_FastDualReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
 //! Write Operations
 
 // Enable write operations to the flash memory
-void FLASH_WriteEnable(void)
+void W25N04KV_WriteEnable(void)
 {
     FlashInstruction writeEnable = {.opCode = WRITE_ENABLE};
 
-    if (FLASH_QSPIInstruct(&writeEnable) != 0)
+    if (W25N04KV_QSPIInstruct(&writeEnable) != 0)
     {
         printf("Error: Failed to enable writes\r\n");
     }
 }
 
 // Disable write operations to the flash memory
-void FLASH_WriteDisable(void)
+void W25N04KV_WriteDisable(void)
 {
     FlashInstruction writeDisable = {.opCode = WRITE_DISABLE};
 
-    if (FLASH_QSPIInstruct(&writeDisable) != 0)
+    if (W25N04KV_QSPIInstruct(&writeDisable) != 0)
     {
         printf("Error: Failed to disable writes\r\n");
     }
 }
 
 // Write to the flash memory's data buffer
-void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
+void W25N04KV_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
     FlashInstruction writeBuffer = {
         .opCode = WRITE_BUFFER,
@@ -355,16 +355,16 @@ void FLASH_WriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
         .dataSize = size,
     };
 
-    FLASH_AwaitNotBusy();
-    FLASH_WriteEnable();
-    if (FLASH_QSPIInstruct(&writeBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    W25N04KV_WriteEnable();
+    if (W25N04KV_QSPIInstruct(&writeBuffer) != 0)
     {
         printf("Error: Failed to write to data buffer\r\n");
     }
 }
 
 // Write data in buffer to a page with a 3 byte address
-void FLASH_WriteExecute(uint32_t pageAddress)
+void W25N04KV_WriteExecute(uint32_t pageAddress)
 {
     FlashInstruction writeExecute = {
         .opCode = WRITE_EXECUTE,
@@ -372,8 +372,8 @@ void FLASH_WriteExecute(uint32_t pageAddress)
         .addressSize = 3,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&writeExecute) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&writeExecute) != 0)
     {
         printf("Error: Failed to write buffer into flash\r\n");
     }
@@ -382,7 +382,7 @@ void FLASH_WriteExecute(uint32_t pageAddress)
 //! Erase Operations
 
 // Erase the entire data buffer
-void FLASH_EraseBuffer(void)
+void W25N04KV_EraseBuffer(void)
 {
     FlashInstruction eraseBuffer = {
         .opCode = WRITE_BUFFER_WITH_RESET,
@@ -390,17 +390,17 @@ void FLASH_EraseBuffer(void)
         .addressSize = 2,
     };
 
-    FLASH_WriteEnable();
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&eraseBuffer) != 0)
+    W25N04KV_WriteEnable();
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&eraseBuffer) != 0)
     {
         printf("Error: Failed to erase buffer\r\n");
     }
-    FLASH_WriteDisable();
+    W25N04KV_WriteDisable();
 }
 
 // Erase the block at the given block address (between 0 and 4095)
-void FLASH_EraseBlock(uint16_t blockAddress)
+void W25N04KV_EraseBlock(uint16_t blockAddress)
 {
     FlashInstruction eraseBlock = {
         .opCode = ERASE_BLOCK,
@@ -408,45 +408,45 @@ void FLASH_EraseBlock(uint16_t blockAddress)
         .addressSize = 3,
     };
 
-    FLASH_AwaitNotBusy();
-    FLASH_WriteEnable();
-    if (FLASH_QSPIInstruct(&eraseBlock) != 0)
+    W25N04KV_AwaitNotBusy();
+    W25N04KV_WriteEnable();
+    if (W25N04KV_QSPIInstruct(&eraseBlock) != 0)
     {
         printf("Error: Failed to erase block\r\n");
     }
 }
 
 // Resets device software and disables write protection
-void FLASH_ResetDeviceSoftware(void)
+void W25N04KV_ResetDeviceSoftware(void)
 {
     FlashInstruction resetSoftware = {.opCode = RESET_DEVICE};
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&resetSoftware) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&resetSoftware) != 0)
     {
         printf("Failed to reset software\r\n");
     }
-    FLASH_DisableWriteProtect();
+    W25N04KV_DisableWriteProtect();
 }
 
 // Resets entire memory array of flash to 0xFF, and also reset software
-void FLASH_EraseDevice(void)
+void W25N04KV_EraseDevice(void)
 {
     // There are 40 blocks
     for (int i = 0; i < 4096; i++)
     {
-        FLASH_EraseBlock(i);
+        W25N04KV_EraseBlock(i);
     }
 
     // Erase buffer and reset software
-    FLASH_EraseBuffer();
-    FLASH_ResetDeviceSoftware();
+    W25N04KV_EraseBuffer();
+    W25N04KV_ResetDeviceSoftware();
 }
 
 //! Circular Buffer Operations
 
 // Finds the head and tail of the flash and stores it into a circular buffer
-void FLASH_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2])
+void W25N04KV_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2])
 {
     // Use entire range if not specified
     if (pageRange == NULL)
@@ -460,8 +460,8 @@ void FLASH_FindHeadTail(CircularBuffer *buf, uint8_t pageRange[2])
 
     for (int p = pageRange[0]; p < pageRange[1]; p++)
     {
-        FLASH_ReadPage(p);
-        FLASH_ReadBuffer(0, 2048, pageBuf.bytes);
+        W25N04KV_ReadPage(p);
+        W25N04KV_ReadBuffer(0, 2048, pageBuf.bytes);
 
         // Check dummy byte of every packet
         for (int i = 0; i < 6; i++)

@@ -5,8 +5,9 @@
  * Also contains functions to parse and run commands inputted by user
  */
 
-#include "W25N04KV.h"
 #include "cli.h"
+#include "W25N04KV.h"
+#include "cmsis_os.h"
 
 //! Macros for CRC codes of different commands
 #define HELP_CMD 0x8875cac
@@ -124,8 +125,35 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 }
 
+// Task which runs the CLI
+void W25N04KV_InitCLI(void)
+{
+    // Quick restart for the flash
+    HAL_Delay(1000);
+    W25N04KV_ReadJEDECID();
+    W25N04KV_ResetDeviceSoftware();
+
+    // Begin listening for user input
+    char receivedCommand[64]; // Buffer to track received command
+    W25N04KV_ListenCommands();
+
+    /* Infinite loop */
+    for (;;)
+    {
+        // Wait for command to be shifted into queue
+        if (osMessageQueueGet(uartQueueHandle, receivedCommand, NULL, osWaitForever) == osOK)
+        {
+            FLASH_RunCommand(receivedCommand);
+            W25N04KV_ListenCommands(); // Restart listening for next command
+        }
+    }
+
+    // In case we accidentally exit from task loop
+    osThreadTerminate(NULL);
+}
+
 // Begins listening for commands
-void FLASH_ListenCommands(void)
+void W25N04KV_ListenCommands(void)
 {
     printf("cmd: ");
     HAL_UART_Receive_IT(&huart3, &receivedByte, 1);
@@ -166,13 +194,13 @@ void FLASH_RunCommand(char *cmdStr)
     case RESET_DEVICE_CMD:
         // Create a new thread to run the reset-device command
         const osThreadAttr_t resetTaskAttr = {.priority = osPriorityHigh};
-        if (osThreadNew(FLASH_ResetDeviceCmd, NULL, &resetTaskAttr) == NULL)
+        if (osThreadNew(W25N04KV_ResetDeviceCmd, NULL, &resetTaskAttr) == NULL)
             printf("Failed to generate reset-device thread\r\n");
         break;
     case REGISTER_TEST_CMD:
         // Create a new thread to run the register-test command
         const osThreadAttr_t registerTaskAttr = {.priority = osPriorityHigh, .stack_size = 512 * 4};
-        if (osThreadNew(FLASH_TestRegistersCmd, NULL, &registerTaskAttr) == NULL)
+        if (osThreadNew(W25N04KV_TestRegistersCmd, NULL, &registerTaskAttr) == NULL)
             printf("Failed to generate register-test task\r\n");
         break;
     case DATA_TEST_CMD:
@@ -222,13 +250,13 @@ void FLASH_RunCommand(char *cmdStr)
 
         // Create a new thread to run the register-test command
         const osThreadAttr_t dataTaskAttr = {.priority = osPriorityHigh, .stack_size = 3000 * 4};
-        if (osThreadNew(FLASH_TestDataCmd, NULL, &dataTaskAttr) == NULL)
+        if (osThreadNew(W25N04KV_TestDataCmd, NULL, &dataTaskAttr) == NULL)
             printf("Failed to generate data-test task\r\n");
         break;
     case HEAD_TAIL_TEST:
         // Craete a new thread to run the head-tail-test command
         const osThreadAttr_t headTailTaskAttr = {.priority = osPriorityHigh, .stack_size = 2048 * 4};
-        if (osThreadNew(FLASH_TestHeadTailCmd, NULL, &headTailTaskAttr) == NULL)
+        if (osThreadNew(W25N04KV_TestHeadTailCmd, NULL, &headTailTaskAttr) == NULL)
             printf("Failed to generate head-tail-test task\r\n");
         break;
     default:

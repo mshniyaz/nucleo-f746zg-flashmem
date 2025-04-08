@@ -10,7 +10,7 @@
 //! Read instructions
 
 // Read buffer on 4 lines
-void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastQuadReadBuffer = {
         .opCode = FAST_QUAD_READ_BUFFER,
@@ -23,15 +23,15 @@ void FLASH_FastQuadReadBuffer(uint16_t columnAddress, uint16_t size, uint8_t *re
         .dataLinesUsed = 4,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&fastQuadReadBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&fastQuadReadBuffer) != 0)
     {
         printf("Error: Failed to read data buffer on 4 lines\r\n");
     }
 }
 
 // Read buffer on 4 lines, also send address on 4 lines
-void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
+void W25N04KV_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readResponse)
 {
     FlashInstruction fastQuadReadIO = {
         .opCode = FAST_QUAD_READ_IO,
@@ -45,8 +45,8 @@ void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
         .dataLinesUsed = 4,
     };
 
-    FLASH_AwaitNotBusy();
-    if (FLASH_QSPIInstruct(&fastQuadReadIO) != 0)
+    W25N04KV_AwaitNotBusy();
+    if (W25N04KV_QSPIInstruct(&fastQuadReadIO) != 0)
     {
         printf("Error: Failed to send address and read data buffer on 4 lines\r\n");
     }
@@ -55,7 +55,7 @@ void FLASH_FastQuadReadIO(uint16_t columnAddress, uint16_t size, uint8_t *readRe
 //! Write instructions
 
 // Write to the flash memory's data buffer on 4 lines
-void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
+void W25N04KV_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
 {
     FlashInstruction quadWriteBuffer = {
         .opCode = QUAD_WRITE_BUFFER,
@@ -67,9 +67,9 @@ void FLASH_QuadWriteBuffer(uint8_t *data, uint16_t size, uint16_t columnAddress)
         .dataLinesUsed = 4,
     };
 
-    FLASH_AwaitNotBusy();
-    FLASH_WriteEnable();
-    if (FLASH_QSPIInstruct(&quadWriteBuffer) != 0)
+    W25N04KV_AwaitNotBusy();
+    W25N04KV_WriteEnable();
+    if (W25N04KV_QSPIInstruct(&quadWriteBuffer) != 0)
     {
         printf("Error: Failed to write to data buffer on 4 lines\r\n");
     }

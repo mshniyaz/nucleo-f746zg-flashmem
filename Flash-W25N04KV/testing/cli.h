@@ -10,14 +10,17 @@
 #include <string.h>
 #endif
 
+// Task which runs the CLI
+void W25N04KV_InitCLI(void);
+
 /// @brief Listens for and processes incoming commands for testing and debugging. Not meant to be called except within
 /// the FreeRTOS "ListenCommands" task.
-void FLASH_ListenCommands(void);
+void W25N04KV_ListenCommands(void);
 
 // Testing functions
-void FLASH_ResetDeviceCmd(void);
-void FLASH_TestRegistersCmd(void);
-void FLASH_TestDataCmd(void);
-void FLASH_TestHeadTailCmd(void);
+void W25N04KV_ResetDeviceCmd(void);
+void W25N04KV_TestRegistersCmd(void);
+void W25N04KV_TestDataCmd(void);
+void W25N04KV_TestHeadTailCmd(void);
 
 #endif /* CLI_H_ */
