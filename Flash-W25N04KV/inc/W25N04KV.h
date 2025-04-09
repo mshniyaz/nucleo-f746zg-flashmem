@@ -10,7 +10,7 @@
 
 #include "cmsis_os.h"
 #include "stm32f7xx_hal.h"
-#include "testing/cli.h"
+#include "cli.h"
 
 // From C's standard lib
 #ifndef FLASH_STDLIB_
